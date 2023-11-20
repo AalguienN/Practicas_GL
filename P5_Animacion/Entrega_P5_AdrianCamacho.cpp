@@ -12,9 +12,12 @@
 #include <iostream>	
 #include <codebase.h>
 
+static int estadoAnimacion = 6;
+
+
 // Distancia de la cámara
-static const float distCam = 2;
-static const float alturaCam = 2;
+static float distCam = 2;
+static float alturaCam = 2;
 
 // Listas
 
@@ -233,7 +236,7 @@ void init() {
 
 	for (int i = 0; i < 4; i++) {
 		glPushMatrix();
-		glTranslatef(cos(i * 2 * PI / 4 + PI / 2), 0.1, sin(i * 2 * PI / 4 + PI / 2));
+		glTranslatef(cos(i * 2 * PI / 4 + PI / 2), 0.01, sin(i * 2 * PI / 4 + PI / 2));
 		if (i%2==1)
 			glRotatef(90*i-45, 0, 1, 0);
 		else
@@ -479,6 +482,12 @@ void update() {
 	glutPostRedisplay();
 }
 
+void onTimer(int cuentaAtras) {
+	glutTimerFunc(cuentaAtras, onTimer, cuentaAtras);
+	estadoAnimacion += 1;
+
+}
+
 void display() {
 	glClearColor(0.1, 0.9, 1, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -490,24 +499,95 @@ void display() {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	// Posición de la cámara
-	gluLookAt(2 * cos(alfa) * distCam, alturaCam, 2 * sin(alfa) * distCam, 0, 1, 0, 0, 1, 0); //Desde el frente
+	float posx = 0;
+	float posy = 0;
+	float posz = 0;
 
-	//EsferaEstrella
-	/*
-	glPushMatrix();
-	glScalef(0.5, 0.5, 0.5);
-	glTranslatef(0, 5, 10);
-	glCallList(esferaEstrellaP4);
-	glPopMatrix();
-	*/
+	float vistax = 0;
+	float vistay = 1;
+	float vistaz = 0;
+
+	//cout << estadoAnimacion;
+	// Posición de la cámara en cada posible animación
+	// El estado de animación se inicia arriba y se modifica con la funcion onTimer
+	switch (estadoAnimacion) {
+		case 0: //Rotación básica sentido horario
+			distCam = 2; alturaCam = 2;
+			gluLookAt(2 * cos(alfa) * distCam, alturaCam, 2 * sin(alfa) * distCam, 0, 1, 0, 0, 1, 0);
+			break;
+		case 1: //Rotación top down
+			distCam = 5; alturaCam = 15;
+			gluLookAt(2 * cos(alfa/2) * distCam, alturaCam, 2 * sin(alfa/2) * distCam, 0, 1, 0, 0, 1, 0);
+			break;
+		case 2: //Rotación básica sentido antihorario
+			distCam = 2; alturaCam = 2;
+			gluLookAt(2 * cos(-alfa) * distCam, alturaCam, 2 * sin(-alfa) * distCam, 0, 1, 0, 0, 1, 0);
+			break;
+		case 3: //Desde el suelo
+			distCam = 2.5f; alturaCam = 0.25f;
+			gluLookAt(distCam, alturaCam, -distCam * 2, 0, 1, 0, 0, 1, 0);
+			break;
+		case 4: //Cara del pulpo
+			distCam = 2; alturaCam = 3;
+			gluLookAt(cos(-sin(rot) * 2 * PI + PI / 2) * distCam, alturaCam, sin(-sin(rot) * 2 * PI + PI / 2) * distCam, 0, 1, 0, 0, 1, 0);
+			break;
+		case 5: //Dedos
+			distCam = 2.2 - 2.2 * cos(0) / 5;
+			alturaCam = -sin(rotacionDedos) / 2 + 0.75 + 4;
+
+			posx = cos(-sin(rot) * 2 * PI + PI / 10) * distCam;
+			posy = alturaCam;
+			posz = sin(-sin(rot) * 2 * PI + PI / 10) * distCam;
+
+			vistax = cos(-sin(rot) * 2 * PI + PI / 10) * distCam;
+			vistay = -1000;
+			vistaz = sin(-sin(rot) * 2 * PI + PI / 10) * distCam;
+
+			gluLookAt(posx, alturaCam, posz, 0, vistay, 0, 0, 1, 0);
+			break;
+		case 6: //POV vagoneta
+			//Hice pruebas y no funcionabaaaaaaaaaa alguna idea? Puedo realizar transformaciones de matriz sobre la cámara?
+			distCam = -sin(0) * 0.1 -2.2 * cos(0)*0.75;
+			alturaCam = 0.75 - sin(rotacionDedos) * 15 * PI / 180; cout << 0.5 << "+" << sin(rotacionDedos) * 15 * PI / 180  << "=" << alturaCam<< "\n";
+
+			posx = cos(-sin(rot) * 2 * PI + 15 * PI / 180) * distCam + 0.35 * cos(-cos(rotacionDedos)*2*PI);
+			posz = sin(-sin(rot) * 2 * PI + 15 * PI / 180) * distCam + 0.35 * sin(-cos(rotacionDedos)*2*PI);
+
+			vistax = cos(-sin(rot) * 2 * PI + 15 * PI / 180) * distCam + 0.4 * cos(-cos(rotacionDedos) * 2 * PI - PI / 4);
+			vistaz = sin(-sin(rot) * 2 * PI + 15 * PI / 180) * distCam + 0.4 * sin(-cos(rotacionDedos) * 2 * PI - PI / 4);
+
+			//-4 - sin(30 * PI / 180), 4, 0 - cos(30 * PI / 180),
+
+			gluLookAt(
+				posx, alturaCam, posz,
+				vistax, alturaCam, vistaz,
+				0, 1, 0
+			);
+
+			//gluLookAt(5, 2, 0,0, 0, 0,0, 1, 0);
+			glPushAttrib(GL_ALL_ATTRIB_BITS);
+			glColor3f(0, 0, 0);
+			glPushMatrix();
+			glTranslatef(posx, alturaCam, posz);
+			glutSolidCube(0.1);
+			glPopMatrix();
+			glPopAttrib();
+
+			break;
+
+		default:
+			gluLookAt(2 * cos(alfa) * distCam, alturaCam, 2 * sin(alfa) * distCam, 0, 1, 0, 0, 1, 0);
+			estadoAnimacion = 0;
+			break;
+	
+	}
 
 	float expansion = 15;
 	int num = 8;
 	glCallList(parteCentral);
 
 	glPushMatrix();
-	glRotatef(sin(rot)*360, 0, 1, 0);
+	glRotatef(sin(rot)*360, 0, 1, 0); //Rotación de todo (brazos + pulpo central)
 	glPushMatrix();
 	glTranslatef(0, 1.8, 0);
 	glColor3f(0, 0, 0.75);
@@ -515,6 +595,9 @@ void display() {
 	glPopMatrix();
 	glRotatef(27.5, 0, 1, 0);
 
+	# pragma region Dibujado de brazos + dedos
+
+	//Conjunto de brazos + dedos
 	for (int i = 0; i <= num; i++) {
 		glPushMatrix();
 		glTranslatef(-sin(i * 2 * PI / num) * 0.1, 0.9, -cos(i * 2 * PI / num) * 0.1);
@@ -522,6 +605,7 @@ void display() {
 		glRotatef(i * 360/ num, 0, 1, 0);
 		glRotatef(-15, 1, 0, 0);
 
+		//Rotación de cada dedo del pulpo
 		if (i % 2 == 0)
 			glRotatef(sin(rotacionDedos) * expansion, 1, 0, 0);
 		else
@@ -532,7 +616,7 @@ void display() {
 		glCallList(brazo);
 
 		glTranslatef(lastx, lasty, lastz);
-		glRotatef(15, 1, 0, 0);
+		glRotatef(15, 1, 0, 0); //Hacemos que estén recas
 
 		if (i % 2 == 0)
 			glRotatef(-sin(rotacionDedos) * expansion, 1, 0, 0);
@@ -544,10 +628,14 @@ void display() {
 			glRotatef(cos(rotacionDedos) * 360, 0, 1, 0);
 		glScalef(0.5, 0.5, 0.5);
 		glCallList(dedos);
+		
 		glPopMatrix();
 	}
 	glPopMatrix();
 
+	# pragma endregion
+
+	#pragma region Suelo
 	glColor3f(0.1,0.5, 0);
 	glBegin(GL_TRIANGLE_FAN);
 	glVertex3f(0, 0, 0);
@@ -564,6 +652,7 @@ void display() {
 	for (int i = 0; i <= 50; i++) {
 		glVertex3f(sin(i * 2 * PI / 50) * 2, 0.01, cos(i * 2 * PI / 50) * 2);
 	}
+	#pragma endregion
 	glEnd();
 
 	for (int i = 0; i <= 100; i++) {
@@ -596,11 +685,12 @@ void display() {
 
 	glutSwapBuffers(); //Para los 2 buffers (incorpora glflush())
 }
-
+/*
 void fun(int value) {
 	glutPostRedisplay();
 	glutTimerFunc(10, fun, 0);
-}
+}*/
+
 
 void reshape(GLint w, GLint h) {
 	float ra = (float)w / (float)h;
@@ -621,13 +711,15 @@ int main(int argc, char** argv) {
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
 	glutInitWindowSize(400, 400);
 	glutInitWindowPosition(50, 50);
-	glutTimerFunc(100, fun, 0);
 
 	// Crear ventana
 	glutCreateWindow(PROYECTO);
 
 	init();
 	//Registrar callbacks
+	//glutTimerFunc(1000, onTimer, 1000); //Cambio de animación
+	//glutTimerFunc(10000, onTimer, 10000); //Cambio de animación
+
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 	glutIdleFunc(update);		//FPS flexibles

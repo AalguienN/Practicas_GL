@@ -1,19 +1,23 @@
 /***************************************************
-*	Practica 1
+*	Practica 5 entrega Animacion
 *
 *	SGI
 *
-*	@author	A.Camacho <acamgar1@etsinf.upv.es
+*	@author	A.Camacho <acamgar1@etsinf.upv.es>
 *
 ***************************************************/
 
-#define PROYECTO "Camara"
+#define PROYECTO "Animacion"
 
 #include <iostream>	
 #include <codebase.h>
 
-static int estadoAnimacion = 6;
+using namespace std;
+using namespace cb;
 
+static int estadoAnimacion = 0;
+
+static float speed = 0.75f;
 
 // Distancia de la cámara
 static float distCam = 2;
@@ -34,25 +38,99 @@ static GLuint brazo;
 static GLuint parteCentral;
 static GLuint pulpo;
 static GLuint tree;
+static GLuint person;
+static GLuint semaforo;
+static GLuint hierba;
 
 static float lastx;
 static float lasty;
 static float lastz;
 
+//-----------------------------------------------------Cuarentena----------------------------------------------------------------//
+static GLfloat asientox = 5; //Default
+static GLfloat asientoy = 5; //Default
+static GLfloat asientoz = 5; //Default
+//-----------------------------------------------------Cuarentena----------------------------------------------------------------//
 
+enum {funcionando, bajandoBrazos, subiendoBrazos}funcionamiento;
 
 static const float radio = 1;
 
 static float alfa = 0;
 static float rotacionDedos = 0;
-static float anglBrazo = 0;
 static float rot = 0;
+
+static float rotacionDedSUBIR_BAJAR_PARES;
+static float rotacionDedSUBIR_BAJAR_IMPARES;
+
+static bool brazosParesBajados;
+static bool brazosImpaBajados;
+static bool brazosParesSubidos;
+static bool brazosImpaSubidos;
+
+struct PersonStruc
+{
+	Vec3 position;
+	Vec3 direction;
+	Vec3 color_camiseta;
+};
+
+static int const NUM_PEOPLE = 100;
+static PersonStruc people[NUM_PEOPLE];
+
+static int const NUM_HIERBA = 200;
+
+struct HierbaStruct
+{
+	Vec3 position;
+	float rotation;
+	float colorVerde;
+};
+
+static HierbaStruct hierbaLista[NUM_HIERBA];
+
+void setPeople(int n) {
+	
+	for (int i = 0; i < n; i++) {
+		PersonStruc person = PersonStruc();
+		
+		person.position = Vec3((rand() % 100 - 50)/5.f, 0, (rand() % 100 - 50)/5.f).normalize()*(rand() % 100) / 10.f;
+		while (person.position.norm() < 2.5) {
+			person.position = Vec3((rand() % 100 - 50) / 5.f, 0, (rand() % 100 - 50) / 5.f).normalize() * (rand() % 100) / 10.f;
+		}
+		person.direction = Vec3(rand() % 10 - 5, 0, rand() % 10 - 5);
+		person.color_camiseta = Vec3(rand() % 100 / 100.f, rand() % 100 / 100.f, rand() % 100 / 100.f);
+		people[i] = person;
+
+		//Poner a true para ver el estado inicial
+		if (false)
+		cout << person.position.x << "\t" << person.position.y << "\t" << person.position.z << "\t|"
+			<< person.direction.x << "\t" << person.direction.y << "\t" << person.direction.z << "\t|"
+			<< person.color_camiseta.x << "\t" << person.color_camiseta.y << "\t" << person.color_camiseta.z << "\n";
+	}	
+}
 
 void init() {
 
 	int res = 0; //Variable auxiliar utilizada para calcular resoluciones
 
 	glEnable(GL_DEPTH_TEST);
+
+	#pragma region person
+	person = glGenLists(1);
+	glNewList(person, GL_COMPILE);
+
+	glPushMatrix();
+	glRotatef(-90, 1, 0, 0);
+	glutSolidCylinder(0.05f, 0.20f, 10, 1);
+	glRotatef(90, 1, 0, 0);
+	glColor3f(0.9, 0.75, 0.5);
+	glTranslatef(0, 0.25f, 0);
+	glutSolidSphere(0.075f, 8, 8);
+	glPopMatrix();
+
+	glEndList();
+	#pragma endregion
 
 	# pragma region Listas de dibujo Practica 3 y 4 estrella + estrella con esfera
 	// INI Estrella 3 ---------------------------------------------------------------------------------------------------------------
@@ -153,11 +231,28 @@ void init() {
 
 	glPushMatrix();
 	glScalef(0.5, 0.5, 0.5);
-	glTranslatef(-0.75, 0, -0.75);
+	glTranslatef(-0.75, 0.01, -0.75);
 	glCallList(asiento);
 	glTranslatef(1.5, 0, 0);
 	glCallList(asiento);
 	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(-0.75/2, 0.01, 0);
+	glPushMatrix();
+	glScalef(4, 4, 4);
+	glColor3f(0, 0, 1);
+	glCallList(person);
+	glPopMatrix();
+	glTranslatef(1.5/2, 0, 0);
+	glPushMatrix();
+	glScalef(4, 4, 4);
+	glColor3f(0, 0, 1);
+	glCallList(person);
+	glPopMatrix();
+	glPopMatrix();
+
+
 
 	//Paredes exteriores Color mas claro
 	glColor3f(1, 1, 0);
@@ -248,8 +343,9 @@ void init() {
 	glPushMatrix();
 	//glTranslatef(0, 0.5, 0);
 	glScalef(0.4f, 0.4f, 0.4f);
+	glTranslatef(0, 0.5f, 0);
 	glCallList(esferaEstrellaP4);
-	glTranslatef(0, 1, 0);
+	glTranslatef(0, 0.5f, 0);
 	glRotatef(-90,4,0,0);
 	glutSolidCylinder(1, 2, 10, 10);
 
@@ -463,6 +559,94 @@ void init() {
 	glEndList();
 	#pragma endregion
 
+	#pragma region semaforo
+	semaforo = glGenLists(1);
+	glNewList(semaforo, GL_COMPILE);
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+	//Luz con color depende del color que se defina antes de llamar
+	glPushMatrix();
+	glTranslatef(0.125, 0.9f, 0);
+	glScalef(0.2f, 1, 1);
+	glutSolidSphere(0.1f,8,8);
+	glTranslatef(0,0.25f,0);
+	glutSolidSphere(0.1f, 8, 8);
+	glPopMatrix();
+
+	glColor3f(0.1f, 0.1f, 0.1f);
+	glPushMatrix();
+	glRotatef(-90,1,0,0);
+	glutSolidCylinder(0.05f,1,4,1);
+	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(0, 1, 0);
+	glScalef(0.5f, 1.25f, 0.5f);
+	glutSolidCube(0.5f);
+	glPopMatrix();	
+
+	glPopAttrib();
+	glEndList();
+	#pragma endregion
+
+	#pragma region hierba
+	hierba = glGenLists(1);
+	glNewList(hierba, GL_COMPILE);
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+	glPushMatrix();
+	Vec3 pos[] = {Vec3(0,0,0), Vec3(0.5,0,0), Vec3(0.5,0,0.5), Vec3(0,0,0.5), Vec3(-0.5,0,0.5), Vec3(-0.5,0,0), Vec3(-0.5,0,-0.5), Vec3(0,0,-0.5), Vec3(0.5,0,-0.5) };
+	for (int i = 0; i < 9; i++) {
+		for (int j = 0; j < 9; j++) {
+			glBegin(GL_TRIANGLE_STRIP);
+			glVertex3f(pos[i].x + pos[j].x, 0, pos[i].z + pos[j].z);
+			glVertex3f(0.05f + pos[i].x + pos[j].x, 0, pos[i].z + pos[j].z);
+			glVertex3f(0.05f / 2 + pos[i].x + pos[j].x, 0.05f, pos[i].z + pos[j].z);
+			glEnd();
+
+			glBegin(GL_TRIANGLE_STRIP);
+			glVertex3f(pos[i].x + pos[j].x, 0, pos[i].z + pos[j].z);
+			glVertex3f(-0.05f + pos[i].x + pos[j].x, 0, 0.05f + pos[i].z + pos[j].z);
+			glVertex3f(-0.05f / 2 + pos[i].x + pos[j].x, 0.05f, 0.05f/2 + pos[i].z + pos[j].z);
+			glEnd();
+
+			glBegin(GL_TRIANGLE_STRIP);
+			glVertex3f(pos[i].x + pos[j].x, 0, pos[i].z + pos[j].z);
+			glVertex3f(pos[i].x + pos[j].x, 0, -0.05f + pos[i].z + pos[j].z);
+			glVertex3f(+ pos[i].x + pos[j].x, 0.05f, -0.05f/2 + pos[i].z + pos[j].z);
+			glEnd();
+		}
+	}
+	glPopMatrix();
+
+	glPopAttrib();
+	glEndList();
+	#pragma endregion
+
+	setPeople(NUM_PEOPLE);
+
+	//Set hierba
+	for (int i = 0; i < NUM_HIERBA; i++) {
+		hierbaLista[i].position = Vec3(rand()%2000 / 100.f - 10.f,0,rand()%2000 / 100.f - 10.f);
+		while (hierbaLista[i].position.norm() < 3.5f || hierbaLista[i].position.norm() > 8.5f) 
+		{ hierbaLista[i].position = Vec3(rand() % 2000 / 100.f - 10.f, 0, rand() % 2000 / 100.f - 10.f); }
+		hierbaLista[i].rotation = float(rand()%360);
+		hierbaLista[i].colorVerde = float(rand()%25)/100.f + 0.4f;
+	}
+}
+
+void movePeople(float delta) {
+	for (int i = 0; i < NUM_PEOPLE; i++) {
+		people[i].position += people[i].direction * delta * speed / 4;
+		if (people[i].position.norm() > 10) { //si se salen de los límites
+			people[i].position = people[i].position.normalize() * 10;		 //Les fijamos en los límites
+			people[i].direction = Vec3(rand() % 10 - 5, 0, rand() % 10 - 5); //Nueva dirección
+		}
+		if (people[i].position.norm() < 3) {  //si se acercan mucho al pulpo
+			people[i].position = people[i].position.normalize() * 3;		 //Les fijamos en los límites
+			people[i].direction = Vec3(rand() % 10 - 5, 0, rand() % 10 - 5); //Nueva dirección
+		}
+	}
 }
 
 void update() {
@@ -473,11 +657,34 @@ void update() {
 	int hora_actual = glutGet(GLUT_ELAPSED_TIME);
 	float delta = (hora_actual - hora_anterior) / 1000.0f;
 
+	delta *= speed;
+
 	alfa += omega * delta;
-	rotacionDedos += 1 * delta;
-	anglBrazo += 0.1 * delta;
-	rot += 0.3 * delta;
+
+	//La rotación va dictada por el estado de funcionamiento de la máquina
+	if (funcionamiento == funcionando) {
+		rotacionDedos += 1 * delta;
+		rot += 0.3 * delta;
+	}
+	else if (funcionamiento == bajandoBrazos) {
+		if (!brazosParesBajados) {
+			rotacionDedSUBIR_BAJAR_PARES += 4 * delta;
+		}		
+		if (!brazosImpaBajados) {
+			rotacionDedSUBIR_BAJAR_IMPARES += 4 * delta;
+		}
+	}
+	else if (funcionamiento == subiendoBrazos) {
+		if (!brazosParesSubidos) {
+			rotacionDedSUBIR_BAJAR_PARES -= 4 * delta;
+		}
+		if (!brazosImpaSubidos) {
+			rotacionDedSUBIR_BAJAR_IMPARES -= 4 * delta;
+		}
+	}
 	hora_anterior = hora_actual;
+
+	movePeople(delta);
 
 	glutPostRedisplay();
 }
@@ -485,8 +692,8 @@ void update() {
 void onTimer(int cuentaAtras) {
 	glutTimerFunc(cuentaAtras, onTimer, cuentaAtras);
 	estadoAnimacion += 1;
-
 }
+
 
 void display() {
 	glClearColor(0.1, 0.9, 1, 1.0f);
@@ -499,6 +706,9 @@ void display() {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
+	////////////////////////////////////////////////////////
+	// Variables auxiliares para la contrucción del pulpo //
+	////////////////////////////////////////////////////////
 	float posx = 0;
 	float posy = 0;
 	float posz = 0;
@@ -507,9 +717,16 @@ void display() {
 	float vistay = 1;
 	float vistaz = 0;
 
-	//cout << estadoAnimacion;
-	// Posición de la cámara en cada posible animación
-	// El estado de animación se inicia arriba y se modifica con la funcion onTimer
+	Vec3 posDedos(0, 0, 0);
+	Vec3 posVagon(0, 0, 0);
+	Vec3 posLookAt(0, 0, 0);
+
+	//////////////////////////////////////////////////////////////////////////////////
+	// Posición de la cámara en cada posible animación								//
+	// El estado de animación se inicia arriba y se modifica con la funcion onTimer //
+	//////////////////////////////////////////////////////////////////////////////////
+
+	#pragma region posicion de camara
 	switch (estadoAnimacion) {
 		case 0: //Rotación básica sentido horario
 			distCam = 2; alturaCam = 2;
@@ -527,11 +744,58 @@ void display() {
 			distCam = 2.5f; alturaCam = 0.25f;
 			gluLookAt(distCam, alturaCam, -distCam * 2, 0, 1, 0, 0, 1, 0);
 			break;
-		case 4: //Cara del pulpo
+
+		case 4: //POV vagoneta
+
+
+			//Transformaciones requeridas para colocar la cámara en un vagón de manera aproximada
+			//Vector relativo a la posición de los dedos respecto al centro
+			posDedos += Vec3(-sin(0) * 0.1f, 0.9f + 1.8f, -cos(0) * 0.1f);
+			posDedos += Vec3(lastx * 2, lastx * 2, lastz * 2);
+			posDedos.rotY(sin(rot) * 2 * PI);
+			posDedos.rotY(27.5f * PI / 180);
+
+			// En el caso que la máquina esté en funcionamiento o parada
+			if (funcionamiento == funcionando)
+				posDedos += Vec3(0, -sin(-rotacionDedos) - 0.5f, 0);
+			else
+				posDedos += Vec3(0, -sin(-rotacionDedSUBIR_BAJAR_PARES) - 0.5f, 0);
+
+			posDedos = Vec3(posDedos.x * 0.75 * 0.5, posDedos.y * 0.75 * 0.5, posDedos.z * 0.75 * 0.5);
+
+			//Vector relativo a la posición de la vagoneta respecto al centro de los dedos
+			posVagon += Vec3(cos(PI / 2), 0, sin(PI / 2));
+
+			// En el caso que la máquina esté en funcionamiento o parada
+			if (funcionamiento == funcionando)
+				posVagon.rotY(sin(rotacionDedos) * 2 * PI);
+
+			posVagon.rotY(sin(rot) * 2 * PI);
+			posVagon.rotY((27.5f) * PI / 180);
+			posVagon += Vec3(0, -.4f, 0);
+			posVagon = Vec3(posVagon.x / 3, posVagon.y / 3, posVagon.z / 3);
+
+			//Dirección hacia la que miraremos
+			posLookAt = posVagon;
+			posLookAt.rotY(PI / 8);
+
+			//cout << posDedos.x << " \t " << posDedos.y << " \t " << posDedos.z << "\n";
+
+			asientox = posDedos.x + posVagon.x;
+			asientoy = posDedos.y + posVagon.y;
+			asientoz = posDedos.z + posVagon.z;
+
+			//-----------------------------------------------------Posicion Camara Vagoneta----------------------------------------------------------------//
+			gluLookAt(asientox, asientoy, asientoz, posDedos.x + posLookAt.x, posDedos.y + posLookAt.y, posDedos.z + posLookAt.z, 0, 1, 0);
+			//-----------------------------------------------------Posicion Camara Vagoneta----------------------------------------------------------------//
+
+			break;
+
+		case 5: //Cara del pulpo
 			distCam = 2; alturaCam = 3;
 			gluLookAt(cos(-sin(rot) * 2 * PI + PI / 2) * distCam, alturaCam, sin(-sin(rot) * 2 * PI + PI / 2) * distCam, 0, 1, 0, 0, 1, 0);
 			break;
-		case 5: //Dedos
+		case 6: //Dedos
 			distCam = 2.2 - 2.2 * cos(0) / 5;
 			alturaCam = -sin(rotacionDedos) / 2 + 0.75 + 4;
 
@@ -545,60 +809,41 @@ void display() {
 
 			gluLookAt(posx, alturaCam, posz, 0, vistay, 0, 0, 1, 0);
 			break;
-		case 6: //POV vagoneta
-			//Hice pruebas y no funcionabaaaaaaaaaa alguna idea? Puedo realizar transformaciones de matriz sobre la cámara?
-			distCam = -sin(0) * 0.1 -2.2 * cos(0)*0.75;
-			alturaCam = 0.75 - sin(rotacionDedos) * 15 * PI / 180; cout << 0.5 << "+" << sin(rotacionDedos) * 15 * PI / 180  << "=" << alturaCam<< "\n";
-
-			posx = cos(-sin(rot) * 2 * PI + 15 * PI / 180) * distCam + 0.35 * cos(-cos(rotacionDedos)*2*PI);
-			posz = sin(-sin(rot) * 2 * PI + 15 * PI / 180) * distCam + 0.35 * sin(-cos(rotacionDedos)*2*PI);
-
-			vistax = cos(-sin(rot) * 2 * PI + 15 * PI / 180) * distCam + 0.4 * cos(-cos(rotacionDedos) * 2 * PI - PI / 4);
-			vistaz = sin(-sin(rot) * 2 * PI + 15 * PI / 180) * distCam + 0.4 * sin(-cos(rotacionDedos) * 2 * PI - PI / 4);
-
-			//-4 - sin(30 * PI / 180), 4, 0 - cos(30 * PI / 180),
-
-			gluLookAt(
-				posx, alturaCam, posz,
-				vistax, alturaCam, vistaz,
-				0, 1, 0
-			);
-
-			//gluLookAt(5, 2, 0,0, 0, 0,0, 1, 0);
-			glPushAttrib(GL_ALL_ATTRIB_BITS);
-			glColor3f(0, 0, 0);
-			glPushMatrix();
-			glTranslatef(posx, alturaCam, posz);
-			glutSolidCube(0.1);
-			glPopMatrix();
-			glPopAttrib();
-
-			break;
 
 		default:
+			distCam = 2; alturaCam = 2;
 			gluLookAt(2 * cos(alfa) * distCam, alturaCam, 2 * sin(alfa) * distCam, 0, 1, 0, 0, 1, 0);
 			estadoAnimacion = 0;
 			break;
 	
 	}
+	#pragma endregion
 
 	float expansion = 15;
 	int num = 8;
+
 	glCallList(parteCentral);
 
-	glPushMatrix();
-	glRotatef(sin(rot)*360, 0, 1, 0); //Rotación de todo (brazos + pulpo central)
+	glPushMatrix(); // INICIO Matriz que contiene cabeza de pulpo y brazos
+
+	#pragma region cabeza pulpo
+
+	glRotatef(sin(rot) * 360, 0, 1, 0); //Rotación de todo (brazos + pulpo central)
 	glPushMatrix();
 	glTranslatef(0, 1.8, 0);
 	glColor3f(0, 0, 0.75);
 	glCallList(pulpo);
 	glPopMatrix();
+
+	#pragma endregion
+
 	glRotatef(27.5, 0, 1, 0);
 
 	# pragma region Dibujado de brazos + dedos
 
-	//Conjunto de brazos + dedos
+	//Dibujado y movimiento de brazos y dedos del pulpo
 	for (int i = 0; i <= num; i++) {
+
 		glPushMatrix();
 		glTranslatef(-sin(i * 2 * PI / num) * 0.1, 0.9, -cos(i * 2 * PI / num) * 0.1);
 
@@ -606,11 +851,57 @@ void display() {
 		glRotatef(-15, 1, 0, 0);
 
 		//Rotación de cada dedo del pulpo
-		if (i % 2 == 0)
-			glRotatef(sin(rotacionDedos) * expansion, 1, 0, 0);
-		else
-			glRotatef(sin(rotacionDedos+PI) * expansion, 1, 0, 0);
+		if (funcionamiento == funcionando) {
+			if (i % 2 == 0)
+				glRotatef(sin(rotacionDedos) * expansion, 1, 0, 0);
+			else
+				glRotatef(sin(rotacionDedos+PI) * expansion, 1, 0, 0);
+		}
+		else if (funcionamiento == bajandoBrazos) {
+			if (i % 2 == 0 && sin(rotacionDedSUBIR_BAJAR_PARES) > -0.9f) {
+				glRotatef(sin(rotacionDedSUBIR_BAJAR_PARES) * expansion, 1, 0, 0);
+			}
+			else if (i % 2 == 0 && funcionamiento == bajandoBrazos && sin(rotacionDedSUBIR_BAJAR_PARES) <= -0.9f) {
+				if (!brazosParesBajados) {
+					brazosParesBajados = true;
+					cout << "brazosParesBajados\n";
+				}
+				glRotatef(sin(rotacionDedSUBIR_BAJAR_PARES)* expansion, 1, 0, 0);
+			}
 
+			if (i % 2 == 1 && sin(rotacionDedSUBIR_BAJAR_IMPARES+PI) > -0.9f) {
+				glRotatef(sin(rotacionDedSUBIR_BAJAR_IMPARES+PI) * expansion, 1, 0, 0);
+			}
+			else if (i % 2 == 1 && funcionamiento == bajandoBrazos && sin(rotacionDedSUBIR_BAJAR_IMPARES+PI) <= -0.9f) {
+				if (!brazosImpaBajados) {
+					brazosImpaBajados = true;
+					cout << "brazosImparesBajados\n";
+				}
+				glRotatef(sin(rotacionDedSUBIR_BAJAR_IMPARES+PI)* expansion, 1, 0, 0);
+			}
+		}
+		else if (funcionamiento == subiendoBrazos) {
+			if (i % 2 == 0 && !(sin(rotacionDedSUBIR_BAJAR_PARES) < sin(rotacionDedos) + 0.1f && sin(rotacionDedSUBIR_BAJAR_PARES) > sin(rotacionDedos) - 0.1f)) {
+				glRotatef(sin(rotacionDedSUBIR_BAJAR_PARES) * expansion, 1, 0, 0);
+			}
+			else if (i % 2 == 0 && funcionamiento == subiendoBrazos && sin(rotacionDedSUBIR_BAJAR_PARES) < sin(rotacionDedos) + 0.1f && sin(rotacionDedSUBIR_BAJAR_PARES) > sin(rotacionDedos) - 0.1f) {
+				if (!brazosParesSubidos) {
+					brazosParesSubidos = true;
+					cout << "brazosParesSubidos" << rotacionDedos << ", " << rotacionDedSUBIR_BAJAR_PARES << "\n";
+				}
+				glRotatef(sin(rotacionDedos) * expansion, 1, 0, 0);
+			}
+			if (i % 2 == 1 &&  !(sin(rotacionDedSUBIR_BAJAR_IMPARES + PI) < sin(rotacionDedos + PI) + 0.1f && sin(rotacionDedSUBIR_BAJAR_IMPARES + PI) > sin(rotacionDedos + PI) - 0.1f)) {
+				glRotatef(sin(rotacionDedSUBIR_BAJAR_IMPARES + PI) * expansion, 1, 0, 0);
+			}
+			else if (i % 2 == 1 && funcionamiento == subiendoBrazos && sin(rotacionDedSUBIR_BAJAR_IMPARES + PI) < sin(rotacionDedos + PI) + 0.1f && sin(rotacionDedSUBIR_BAJAR_IMPARES + PI) > sin(rotacionDedos + PI) - 0.1f) {
+				if (!brazosImpaSubidos) {
+					brazosImpaSubidos = true;
+					cout << "brazosImpaSubidos" << rotacionDedos + PI << "," << rotacionDedSUBIR_BAJAR_IMPARES << "\n";
+				}
+				glRotatef(sin(rotacionDedos + PI) * expansion, 1, 0, 0);
+			}
+		}
 		glScalef(0.75, 0.75, 0.75);
 
 		glCallList(brazo);
@@ -618,22 +909,38 @@ void display() {
 		glTranslatef(lastx, lasty, lastz);
 		glRotatef(15, 1, 0, 0); //Hacemos que estén recas
 
-		if (i % 2 == 0)
-			glRotatef(-sin(rotacionDedos) * expansion, 1, 0, 0);
-		else
-			glRotatef(-sin(rotacionDedos + PI) * expansion, 1, 0, 0);
+		
+
+		if (i % 2 == 0) {
+			if (funcionamiento == funcionando) {
+				glRotatef(-sin(rotacionDedos) * expansion, 1, 0, 0);
+			}
+			else {
+				glRotatef(-sin(rotacionDedSUBIR_BAJAR_PARES) * expansion, 1, 0, 0);
+			}
+		}
+		else if (i % 2 == 1) {
+			if (funcionamiento == funcionando) {
+				glRotatef(-sin(rotacionDedos + PI) * expansion, 1, 0, 0);
+			}
+			else {
+				glRotatef(-sin(rotacionDedSUBIR_BAJAR_IMPARES + PI) * expansion, 1, 0, 0);
+			}
+		}
 		if (i % 2 == 0)
 			glRotatef(sin(rotacionDedos) * 360, 0, 1, 0);
 		else
 			glRotatef(cos(rotacionDedos) * 360, 0, 1, 0);
 		glScalef(0.5, 0.5, 0.5);
+
 		glCallList(dedos);
 		
 		glPopMatrix();
 	}
-	glPopMatrix();
 
 	# pragma endregion
+
+	glPopMatrix(); // FIN Matriz que contiene cabeza de pulpo y brazos
 
 	#pragma region Suelo
 	glColor3f(0.1,0.5, 0);
@@ -652,9 +959,10 @@ void display() {
 	for (int i = 0; i <= 50; i++) {
 		glVertex3f(sin(i * 2 * PI / 50) * 2, 0.01, cos(i * 2 * PI / 50) * 2);
 	}
-	#pragma endregion
 	glEnd();
+	#pragma endregion
 
+	#pragma region arboles
 	for (int i = 0; i <= 100; i++) {
 		glPushMatrix();
 		glTranslatef(sin(i * 2 * PI / 100) * 10, 0, cos(i * 2 * PI / 100) * 10);
@@ -662,34 +970,60 @@ void display() {
 		glPopMatrix();
 	}
 
-	glPushMatrix();
-	glTranslatef(3, 0, 1);
-	glCallList(tree);
-	glPopMatrix();
+	Vec3 posTrees[7] = {Vec3(3,0,1), Vec3(-1,0,-4), Vec3(-1,0,6), Vec3(-7,0,3), Vec3(-8,0,-3), Vec3(7,0,4) , Vec3(5,0,-5)};
 
-	glPushMatrix();
-	glTranslatef(-1, 0, -4);
-	glCallList(tree);
-	glPopMatrix();
+	for (int t = 0; t < 7; t++) {
+		glPushMatrix();
+		glTranslatef(posTrees[t].x, posTrees[t].y, posTrees[t].z);
+		glCallList(tree);
+		glPopMatrix();
+	}
+	#pragma endregion
 
-	glPushMatrix();
-	glTranslatef(-1, 0, 6);
-	glCallList(tree);
-	glPopMatrix();
+	#pragma region personas
+	for (int i = 0; i < NUM_PEOPLE; i++) {
+		PersonStruc pers = people[i];
 
+		glPushMatrix();
+		glTranslatef(pers.position.x, pers.position.y, pers.position.z);
+		glColor3f(pers.color_camiseta.x, pers.color_camiseta.y, pers.color_camiseta.z);
+		glCallList(person);
 
-;	//glCallList(brazo);
-	//glCallList(dedos);
-	//glCallList(vagoneta);
-	//glCallList(asiento);
+		glPopMatrix();
+		glPopAttrib();
+		glPopMatrix();
+	}
+	#pragma endregion
+
+	#pragma region Semaforo
+	for (int i = 0; i < 4; i++){
+		glPushMatrix();
+		glTranslatef(cos(i * 2 * PI / 4) * 2.5f, 0, sin(i * 2 * PI / 4) * 2.5f);
+		if (funcionamiento == funcionando)
+			glColor3f(0, 1, 0);
+		else if (funcionamiento == bajandoBrazos)
+			glColor3f(1, 0, 0);
+		else if (funcionamiento == subiendoBrazos)
+			glColor3f(1, 1, 0);
+		glRotatef((i-2) * 360 / 4 * float(i % 2) + i * 360 / 4 * float((i+1) % 2), 0, 1, 0);
+		glScalef(0.5f,0.5f,0.5f);
+		glCallList(semaforo);
+		glPopMatrix();
+	}
+	#pragma endregion
+
+	for (int i = 0; i < NUM_HIERBA; i++) {
+		glPushMatrix();
+		glTranslatef(hierbaLista[i].position.x, 0, hierbaLista[i].position.z);
+		glRotatef(hierbaLista[i].rotation,0,1,0);
+		glColor3f(0, hierbaLista[i].colorVerde, 0);
+		glCallList(hierba);
+		glPopMatrix();
+	}
 
 	glutSwapBuffers(); //Para los 2 buffers (incorpora glflush())
 }
-/*
-void fun(int value) {
-	glutPostRedisplay();
-	glutTimerFunc(10, fun, 0);
-}*/
+
 
 
 void reshape(GLint w, GLint h) {
@@ -700,8 +1034,35 @@ void reshape(GLint w, GLint h) {
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
+	
+	gluPerspective(60, ra, 0.125f, 200);
+}
 
-	gluPerspective(60, ra, 0.1, 200);
+void subirBrazos(int n) {
+	cout << "subiendo brazos " << n << "\n";
+	brazosParesSubidos = false;
+	brazosImpaSubidos = false;
+	funcionamiento = subiendoBrazos;
+
+}
+
+void parar(int n) {
+	cout << "bajando brazos" << n << "\n";
+	brazosParesBajados = false;
+	brazosImpaBajados = false;
+	rotacionDedSUBIR_BAJAR_IMPARES = rotacionDedos; cout << rotacionDedSUBIR_BAJAR_IMPARES << "\n";
+	rotacionDedSUBIR_BAJAR_PARES = rotacionDedos; cout << rotacionDedSUBIR_BAJAR_PARES << "\n";
+	funcionamiento = bajandoBrazos;
+	glutTimerFunc(n/2, subirBrazos, n/2);
+}
+
+
+void vuelta(int n) {
+	cout << "funcionando " << n << "\n";
+	funcionamiento = funcionando;
+	glutTimerFunc(n-n/3, parar, n-2*n/3);
+	glutTimerFunc(n, vuelta, n);
+	
 }
 
 int main(int argc, char** argv) {
@@ -718,7 +1079,8 @@ int main(int argc, char** argv) {
 	init();
 	//Registrar callbacks
 	//glutTimerFunc(1000, onTimer, 1000); //Cambio de animación
-	//glutTimerFunc(10000, onTimer, 10000); //Cambio de animación
+	glutTimerFunc(10000, onTimer, 10000); //Cambio de animación
+	glutTimerFunc(0, vuelta, 27000); //Cambio de animación
 
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);

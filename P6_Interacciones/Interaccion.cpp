@@ -21,7 +21,7 @@ static GLuint suelo;
 //Globales
 const int DIM_PLATAFORMA = 200;
 static float z0 = 1;
-static cb::Sistema3d player;
+static Sistema3d player;
 
 static float speedForward;
 static const float ACCELERATION = 0.001;
@@ -33,6 +33,9 @@ float girox; float giroy;
 
 int xanterior;
 int yanterior;
+
+int windowWidth;
+int windowHeight;
 
 // Funcion de inicializacion propia
 void init()
@@ -105,7 +108,6 @@ void display()
 	Vec3 lookAt = origen - player.getw(); //w
 	Vec3 up = player.getv();
 
-
 	//Posici n de la c mara (eyex, eyey, eyez) | centro punto al que se mira (centerx, centery, centerz) | (upx, upy, upz)
 	//gluLookAt(origen.x, origen.y, origen.z, lookAt.x - giroy, lookAt.y, lookAt.z - girox, up.x, up.y, up.z); //Desde el frente
 
@@ -136,7 +138,10 @@ void reshape(GLint w, GLint h)
 	glLoadIdentity();
 
 	//gluPerspective(apertura vertical, raz n de aspecto (alto:ancho), distancia del plano cercano, distancia del plano alejado); 
-	gluPerspective(60, ra, 0.1, 30);
+	gluPerspective(60, ra, 0.1, 1000);
+
+	int windowWidth = w;
+	int windowHeight = h;
 }
 
 void select() {
@@ -223,6 +228,7 @@ void onDrag(int x, int y) {
 	glutPostRedisplay();
 }
 
+
 void onPassiveMotiotion(int x, int y) {
 	static float pixel2grados = 0.01f;
 
@@ -232,9 +238,16 @@ void onPassiveMotiotion(int x, int y) {
 	player.rotar(-girox, Vec3(player.getu()));
 	player.rotar(-giroy, Vec3(player.getv()));
 
-	xanterior = x;
-	yanterior = y;
+	//xanterior = x;
+	//yanterior = y;
+
+	//Fija el cursor en la posición central de la pantalla
+	glutWarpPointer(windowWidth / 2, windowHeight / 2);
+
+	xanterior = windowWidth / 2;
+	yanterior = windowHeight / 2;
 }
+
 
 int main(int argc, char** argv)
 {
@@ -246,6 +259,9 @@ int main(int argc, char** argv)
 
 	// Crear ventana
 	glutCreateWindow(PROYECTO);
+
+	windowWidth = 500;
+	windowHeight = 500;
 
 	// Registrar callbacks
 	glutKeyboardFunc(onKey);

@@ -5,6 +5,15 @@
 *
 *	@author	A.Camacho <acamgar1@etsinf.upv.es>
 *
+* 
+*  Notas Para la corrección:-------------------------
+*	El código referente a la estructura de personas se lo he pasado a un compañero:
+*   Brian Valiente Ródenas, quien a partir de la estructura y puntos clave a generado
+*   un código similar. En cuanto a generación estructura y movimiento de las personas.
+*   Eso sí, él sólo tomó los conceptos clave y desarrolló por su cuenta el código.
+* 
+*   Te lo comentamos en clase, pero como nos lo digiste lo comentamos por aquí, 
+*   así lo hacemos para evitar confusiones. Un saludo.
 ***************************************************/
 
 #define PROYECTO "Animacion"
@@ -15,21 +24,23 @@
 using namespace std;
 using namespace cb;
 
+// Controla la posición de la cámara
 static int estadoAnimacion = 0;
 
+// Controla la velocidad de la animación en general
 static float speed = 0.75f;
 
 // Distancia de la cámara
 static float distCam = 2;
 static float alturaCam = 2;
 
-// Listas
+/*******Listas de dibujo*******/
 
 // P3 y P4 estrella + esferaEstrella
 static GLuint estrella;
 static GLuint esferaEstrellaP4;
 
-// Pulpo
+// P5
 static GLuint asiento;
 static GLuint vagoneta;
 static GLuint dedos;
@@ -42,42 +53,53 @@ static GLuint person;
 static GLuint semaforo;
 static GLuint hierba;
 
+// Para la posición del conjunto de vagonetas respecto al brazo.
 static float lastx;
 static float lasty;
 static float lastz;
 
-//-----------------------------------------------------Cuarentena----------------------------------------------------------------//
+//Posición de la cámara situada en la vagoneta, se actualiza más adelante
 static GLfloat asientox = 5; //Default
 static GLfloat asientoy = 5; //Default
 static GLfloat asientoz = 5; //Default
-//-----------------------------------------------------Cuarentena----------------------------------------------------------------//
 
-enum {funcionando, bajandoBrazos, subiendoBrazos}funcionamiento;
 
+enum {
+	funcionando,   // Pulpo en funcionamiento
+	bajandoBrazos, // Pulpo pausado bajando brazos
+	subiendoBrazos // Pulpo pausado esperando a volver a empezar
+}funcionamiento;
+
+//Radio de la esfera de la práctica 4
 static const float radio = 1;
 
 static float alfa = 0;
 static float rotacionDedos = 0;
 static float rot = 0;
 
+/********* Parada y reanudado de la atracción *********/
 static float rotacionDedSUBIR_BAJAR_PARES;
 static float rotacionDedSUBIR_BAJAR_IMPARES;
 
+//Variables globales auxiliares en la subida y bajada
 static bool brazosParesBajados;
 static bool brazosImpaBajados;
 static bool brazosParesSubidos;
 static bool brazosImpaSubidos;
+/*****************************************************************/
 
+//Struct que representa una persona
 struct PersonStruc
 {
 	Vec3 position;
 	Vec3 direction;
 	Vec3 color_camiseta;
 };
-
+//Cantidad de personas (funciona bien hasta 10000 en mi ordenador)
 static int const NUM_PEOPLE = 100;
 static PersonStruc people[NUM_PEOPLE];
 
+// Número de dibujado de listas de hierba
 static int const NUM_HIERBA = 200;
 
 struct HierbaStruct
@@ -89,6 +111,7 @@ struct HierbaStruct
 
 static HierbaStruct hierbaLista[NUM_HIERBA];
 
+//Inicializa el vector de personas aleatoriamiente
 void setPeople(int n) {
 	
 	for (int i = 0; i < n; i++) {
@@ -110,11 +133,26 @@ void setPeople(int n) {
 	}	
 }
 
+//Inicializa aleatoriamente el vector de hierbas
+void setHierba() {
+	for (int i = 0; i < NUM_HIERBA; i++) {
+		hierbaLista[i].position = Vec3(rand() % 2000 / 100.f - 10.f, 0, rand() % 2000 / 100.f - 10.f);
+		while (hierbaLista[i].position.norm() < 3.5f || hierbaLista[i].position.norm() > 8.5f)
+		{
+			hierbaLista[i].position = Vec3(rand() % 2000 / 100.f - 10.f, 0, rand() % 2000 / 100.f - 10.f);
+		}
+		hierbaLista[i].rotation = float(rand() % 360);
+		hierbaLista[i].colorVerde = float(rand() % 25) / 100.f + 0.4f;
+	}
+}
+
 void init() {
 
 	int res = 0; //Variable auxiliar utilizada para calcular resoluciones
 
 	glEnable(GL_DEPTH_TEST);
+
+	//Listas de dibujo
 
 	#pragma region person
 	person = glGenLists(1);
@@ -623,16 +661,9 @@ void init() {
 	glEndList();
 	#pragma endregion
 
+	//Inicializadores
 	setPeople(NUM_PEOPLE);
-
-	//Set hierba
-	for (int i = 0; i < NUM_HIERBA; i++) {
-		hierbaLista[i].position = Vec3(rand()%2000 / 100.f - 10.f,0,rand()%2000 / 100.f - 10.f);
-		while (hierbaLista[i].position.norm() < 3.5f || hierbaLista[i].position.norm() > 8.5f) 
-		{ hierbaLista[i].position = Vec3(rand() % 2000 / 100.f - 10.f, 0, rand() % 2000 / 100.f - 10.f); }
-		hierbaLista[i].rotation = float(rand()%360);
-		hierbaLista[i].colorVerde = float(rand()%25)/100.f + 0.4f;
-	}
+	setHierba();
 }
 
 void movePeople(float delta) {
@@ -684,6 +715,7 @@ void update() {
 	}
 	hora_anterior = hora_actual;
 
+	//Movemos las personas una vez cada frame
 	movePeople(delta);
 
 	glutPostRedisplay();
@@ -706,9 +738,9 @@ void display() {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	////////////////////////////////////////////////////////
-	// Variables auxiliares para la contrucción del pulpo //
-	////////////////////////////////////////////////////////
+
+	// Variables auxiliares para la contrucción del pulpo
+
 	float posx = 0;
 	float posy = 0;
 	float posz = 0;
@@ -721,10 +753,10 @@ void display() {
 	Vec3 posVagon(0, 0, 0);
 	Vec3 posLookAt(0, 0, 0);
 
-	//////////////////////////////////////////////////////////////////////////////////
-	// Posición de la cámara en cada posible animación								//
-	// El estado de animación se inicia arriba y se modifica con la funcion onTimer //
-	//////////////////////////////////////////////////////////////////////////////////
+	/*********************************************************************************
+	** Posición de la cámara en cada posible animación								**
+	** El estado de animación se inicia arriba y se modifica con la funcion onTimer **
+	*********************************************************************************/
 
 	#pragma region posicion de camara
 	switch (estadoAnimacion) {
@@ -745,8 +777,7 @@ void display() {
 			gluLookAt(distCam, alturaCam, -distCam * 2, 0, 1, 0, 0, 1, 0);
 			break;
 
-		case 4: //POV vagoneta
-
+		case 4: //Cámara desde la vagoneta
 
 			//Transformaciones requeridas para colocar la cámara en un vagón de manera aproximada
 			//Vector relativo a la posición de los dedos respecto al centro

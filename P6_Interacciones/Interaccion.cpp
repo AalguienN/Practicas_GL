@@ -1,5 +1,7 @@
 /***************************************************
 *	Interaccion.cpp
+* 
+*	P6 y P7
 *
 *	Captura de eventos de usuario
 *
@@ -20,41 +22,80 @@ static GLuint suelo;
 
 //Globales
 const int DIM_PLATAFORMA = 200;
+const int VERTICES_POR_UNIDAD = 4;
 static float z0 = 1;
 static Sistema3d player;
 
 static float speedForward;
-static const float ACCELERATION = 0.001;
+static const float ACCELERATION = 0.0001;
 static const float MAX_SPEED = 0.1;
 
 static Vec3 posPlayer;
 
 float girox; float giroy;
 
-int xanterior;
-int yanterior;
+static int xanterior;
+static int yanterior;
 
-int windowWidth;
-int windowHeight;
+static int windowWidth;
+static int windowHeight;
+
+static bool luces = true;
 
 // Funcion de inicializacion propia
 void init()
 {
 	cout << glGetString(GL_VERSION) << endl;
 	// Canfigurar el motor
-	glEnable(GL_DEPTH_TEST);
+	#pragma region Luces
+
+	static const GLfloat Ambient[4] = { 0.2,0.2,0.2,1 };
+
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, Ambient);
+
+	glLightfv(GL_LIGHT0, GL_AMBIENT, NEGRO);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, GRISCLARO);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, GRISCLARO);	
+	
+	glLightfv(GL_LIGHT1, GL_AMBIENT, NEGRO);
+	glLightfv(GL_LIGHT1, GL_DIFFUSE, GRISCLARO);
+	glLightfv(GL_LIGHT1, GL_SPECULAR, GRISCLARO);
+	glLightf(GL_LIGHT1, GL_SPOT_CUTOFF, 10.0f);
+	glLightf(GL_LIGHT1, GL_SPOT_EXPONENT, 10.0F);
+
+
+	glLightfv(GL_LIGHT2, GL_AMBIENT, NEGRO);
+	glLightfv(GL_LIGHT2, GL_DIFFUSE, GRISCLARO);
+	glLightfv(GL_LIGHT2, GL_SPECULAR, GRISCLARO);
+	glLightf(GL_LIGHT2, GL_SPOT_CUTOFF, 10.0f);
+	glLightf(GL_LIGHT2, GL_SPOT_EXPONENT, 10.0F);
+
+	glEnable(GL_LIGHT0);
+	glEnable(GL_LIGHT1);
+	glEnable(GL_LIGHT2);
+
+
+	#pragma endregion
+
+	glEnable(GL_DEPTH_TEST);	//Profundidad
+	glEnable(GL_LIGHTING);		//Iluminación
+	glEnable(GL_NORMALIZE);
+
 
 	#pragma region suelo lista
+
 	suelo = glGenLists(1);
 	glNewList(suelo, GL_COMPILE);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	glColor3f(1, 1, 1);
+	//glColor3f(1, 1, 1);
 
-	for (int i = 0; i < DIM_PLATAFORMA; i++) {
-		glBegin(GL_TRIANGLE_STRIP);
-		for (int j = 0; j < DIM_PLATAFORMA; j++) {
-			glVertex3f(i-DIM_PLATAFORMA/2, j - DIM_PLATAFORMA / 2, 0);
-			glVertex3f(i + 1 - DIM_PLATAFORMA / 2, j - DIM_PLATAFORMA / 2, 0);
+	for (int i = 0; i < DIM_PLATAFORMA * VERTICES_POR_UNIDAD; i++) {
+		glBegin(GL_QUAD_STRIP);
+		for (int j = 0; j < DIM_PLATAFORMA * VERTICES_POR_UNIDAD; j++) {
+			glNormal3f(0, 0, 1);
+			glVertex3f((i-DIM_PLATAFORMA/2)/ float(VERTICES_POR_UNIDAD), (j - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), 0);
+			glNormal3f(0, 0, 1);
+			glVertex3f((i + 1 - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), (j - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), 0);
 		}
 		glEnd();
 	}
@@ -86,8 +127,8 @@ void update() {
 	Vec3 w = player.getw();
 	posPlayer += Vec3(-w.x * speedForward * delta, -w.y * speedForward * delta, -w.z * speedForward * delta);
 	
-	cout << speedForward << "\n";
-	cout << "rotaciones " << girox << ":" << giroy;
+	//cout << speedForward << "\n";
+	//cout << "rotaciones " << girox << ":" << giroy;
 	glutPostRedisplay();
 }
 
@@ -98,7 +139,7 @@ void display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPolygonMode(GL_FRONT, GL_FILL);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
@@ -108,14 +149,45 @@ void display()
 	Vec3 lookAt = origen - player.getw(); //w
 	Vec3 up = player.getv();
 
-	//Posici n de la c mara (eyex, eyey, eyez) | centro punto al que se mira (centerx, centery, centerz) | (upx, upy, upz)
-	//gluLookAt(origen.x, origen.y, origen.z, lookAt.x - giroy, lookAt.y, lookAt.z - girox, up.x, up.y, up.z); //Desde el frente
+	Vec3 faro1 =  Vec3(0,0,0) + player.getu()*0.25f;
+	Vec3 faro2 =  Vec3(0,0,0) - player.getu()*0.25f;
+
+	static GLfloat posFaro1[] = { faro1.x, faro1.y, faro1.z, 1 }; //PosSpot
+	glLightfv(GL_LIGHT1, GL_POSITION, posFaro1);
+	GLfloat dir_central1[] = { 0.1f, 0, -1.0f };
+	glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, dir_central1);
+
+	//static GLfloat dirF1[] = { 0,0,0,0 };
+	//glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, dirF1);
+
+	static GLfloat posFaro2[] = { faro2.x, faro2.y, faro2.z, 1 }; //PosSpot
+	glLightfv(GL_LIGHT2, GL_POSITION, posFaro2);
+	GLfloat dir_central2[] = { -0.1f, 0, -1.0f };
+	glLightfv(GL_LIGHT2, GL_SPOT_DIRECTION, dir_central2);
 
 	gluLookAt(origen.x, origen.y, origen.z, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z); //Desde el frente
-	//gluLookAt(0, 2, 0, 0, 0, 0, 1, 0, 0); //Desde arriba
-	ejes();
+
+	//ejes();
+
+	static GLfloat posicionEstrella[] = { 50,0,100,0}; //Direccional
+	glLightfv(GL_LIGHT0, GL_POSITION, posicionEstrella);
+
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, GRISOSCURO);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, GRISOSCURO);
+	glMaterialf(GL_FRONT, GL_SHININESS, 0);
 
 	glCallList(suelo);
+
+	glPushMatrix();
+	glTranslatef(0,10,0);
+	glutSolidSphere(5,50,50);
+	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(10, 20, 10);
+	glRotatef(90, 1, 0, 0);
+	glutSolidTeapot(5);
+	glPopMatrix();
 
 	glutSwapBuffers();
 }
@@ -123,56 +195,31 @@ void display()
 // Funcion de atencion al redimensionamiento
 void reshape(GLint w, GLint h)
 {
-	//problema se deforma (no hay isometria == las medidas no se corresponden al variar el  rea)
-	//soluci n:
-	//Relaci n de aspecto
+
+	//Relación de aspecto
 	float ra = (float)w / (float)h;
+
+	windowWidth = w;
+	windowHeight = h;
 
 	//fijado de dimensiones del marco
 	glViewport(0, 0, w, h);
-
-	//fija en la esquina superior derecha
-	//glViewport(w / 2, h / 2, w / 2, h / 2);
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
 	//gluPerspective(apertura vertical, raz n de aspecto (alto:ancho), distancia del plano cercano, distancia del plano alejado); 
-	gluPerspective(60, ra, 0.1, 1000);
-
-	int windowWidth = w;
-	int windowHeight = h;
+	gluPerspective(90, ra, 0.1, 1000);
 }
 
-void select() {
-	// Hace lo mismo que display pero dibujando los objetos que son seleccionablesde un color diferente cada uno
-	// y no intercabia los buffers
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	//Posici n de la c mara (eyex, eyey, eyez) | centro punto al que se mira (centerx, centery, centerz) | (upx, upy, upz)
-	gluLookAt(2, 2, 2, 0, 0, 0, 0, 1, 0); //Desde el frente
-	//gluLookAt(0, 2, 0, 0, 0, 0, 1, 0, 0); //Desde arriba
-	//ejes() no son seleccionables;
-
-	
-
-	//Siempre solida
-	glutSolidTeapot(0.5);
-
-	glPopMatrix();
-
-	//Notese que no dibujamos cambio de buffers ni redisplay
-}
 
 void acelerar() {
+	//cout << "acelerando";
 	if (speedForward < MAX_SPEED)
 		speedForward += ACCELERATION; //Tiene que ser coerente con el tiempo FALTA
 }
 void frenar() {
+	//cout << "frenando";
 	if (speedForward > -MAX_SPEED)
 		speedForward -= ACCELERATION; //Tiene que ser coerente con el tiempo FALTA
 }
@@ -180,14 +227,37 @@ void frenar() {
 void onKey(unsigned char tecla, int x, int y) {
 	switch (tecla) {
 	case 'a':
+	case 'A':
 		acelerar();
 		break;
 	case 'z':
+	case 'Z':
 		frenar();
+		break;
+
+	default:
+		break;
+	}
+	glutPostRedisplay();
+
+}void onKeyUP(unsigned char tecla, int x, int y) {
+	switch (tecla) {
+	
+	case 'l':
+	case 'L':
+		luces = !luces;
+		if (luces) {
+			glEnable(GL_LIGHT1);
+			glEnable(GL_LIGHT2);
+		}
+		else {
+			glDisable(GL_LIGHT1);
+			glDisable(GL_LIGHT2);
+		}
 		break;
 	case 27:
 		exit(0);
-		default:
+	default:
 		break;
 	}
 	glutPostRedisplay();
@@ -207,7 +277,7 @@ void onClick(int boton, int estado, int x, int y) {
 	GLfloat yv = viewport[3]/*Alto*/ - y;
 
 	//Dibujar en el backbuffer los objetos s lidos y de un color diferente cada uno
-	select();
+	//select();
 
 	//Leer del backbuffer el color que hay debajo del punto xv, yv
 	//glReadPixels(xv, yv, 1, 1, GL_BLUE, GL_UNSIGNED_BYTE, objeto);
@@ -265,6 +335,7 @@ int main(int argc, char** argv)
 
 	// Registrar callbacks
 	glutKeyboardFunc(onKey);
+	glutKeyboardUpFunc(onKeyUP);
 	glutMotionFunc(onDrag);
 	glutMouseFunc(onClick);
 

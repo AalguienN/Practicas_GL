@@ -46,14 +46,14 @@ static bool luces = true;
 void init()
 {
 	cout << glGetString(GL_VERSION) << endl;
-	// Canfigurar el motor
+	
 	#pragma region Luces
 
 	static const GLfloat Ambient[4] = { 0.2,0.2,0.2,1 };
 
 	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, Ambient);
 
-	glLightfv(GL_LIGHT0, GL_AMBIENT, NEGRO);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, GRISOSCURO);
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, GRISCLARO);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, GRISCLARO);	
 	
@@ -80,7 +80,6 @@ void init()
 	glEnable(GL_DEPTH_TEST);	//Profundidad
 	glEnable(GL_LIGHTING);		//Iluminación
 	glEnable(GL_NORMALIZE);
-
 
 	#pragma region suelo lista
 
@@ -112,13 +111,12 @@ void init()
 	player.setv(Vec3(0, 0, 1));  //z
 	speedForward = 0;
 
-	posPlayer = Vec3(0,0,z0); //Posicion global player
+	posPlayer = Vec3(0,0,z0); //Posicion inicial global player
 }
 
 void update() {
 
 	//Animación coherente con el tiempo transcurrido (sin control de FPS)
-	static const float omega = 0.1; //omega grados por segundo
 	static int hora_anterior = glutGet(GLUT_ELAPSED_TIME);
 	int hora_actual = glutGet(GLUT_ELAPSED_TIME);
 
@@ -127,8 +125,6 @@ void update() {
 	Vec3 w = player.getw();
 	posPlayer += Vec3(-w.x * speedForward * delta, -w.y * speedForward * delta, -w.z * speedForward * delta);
 	
-	//cout << speedForward << "\n";
-	//cout << "rotaciones " << girox << ":" << giroy;
 	glutPostRedisplay();
 }
 
@@ -142,6 +138,11 @@ void display()
 	glPolygonMode(GL_FRONT, GL_FILL);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+
+	#pragma region Posiciones_faros
+	/****************************************************************
+	*	 Posiciones de los faros									*
+	****************************************************************/
 
 	Vec3 origen = player.geto();
 	origen += posPlayer;
@@ -157,13 +158,11 @@ void display()
 	GLfloat dir_central1[] = { 0.1f, 0, -1.0f };
 	glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, dir_central1);
 
-	//static GLfloat dirF1[] = { 0,0,0,0 };
-	//glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, dirF1);
-
 	static GLfloat posFaro2[] = { faro2.x, faro2.y, faro2.z, 1 }; //PosSpot
 	glLightfv(GL_LIGHT2, GL_POSITION, posFaro2);
 	GLfloat dir_central2[] = { -0.1f, 0, -1.0f };
 	glLightfv(GL_LIGHT2, GL_SPOT_DIRECTION, dir_central2);
+	#pragma endregion
 
 	gluLookAt(origen.x, origen.y, origen.z, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z); //Desde el frente
 
@@ -178,10 +177,28 @@ void display()
 
 	glCallList(suelo);
 
+
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, AZUL);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, AZUL);
+	glMaterialf(GL_FRONT, GL_SHININESS, 1000);
+
 	glPushMatrix();
 	glTranslatef(0,10,0);
 	glutSolidSphere(5,50,50);
 	glPopMatrix();
+
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, VERDE);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, VERDE);
+	glMaterialf(GL_FRONT, GL_SHININESS, 1000);
+
+	glPushMatrix();
+	glTranslatef(20, 10, 6);
+	glutSolidTorus(1, 5, 50,50);
+	glPopMatrix();
+
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, ROJO);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, ROJO);
+	glMaterialf(GL_FRONT, GL_SHININESS, 1000);
 
 	glPushMatrix();
 	glTranslatef(10, 20, 10);

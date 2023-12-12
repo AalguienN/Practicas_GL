@@ -27,8 +27,8 @@ static float z0 = 1;
 static Sistema3d player;
 
 static float speedForward;
-static const float ACCELERATION = 0.0001;
-static const float MAX_SPEED = 0.1;
+static const float ACCELERATION = 0.1;
+static const float MAX_SPEED = 10;
 
 static Vec3 posPlayer;
 
@@ -116,7 +116,7 @@ void init()
 
 void update() {
 
-	//Animación coherente con el tiempo transcurrido (sin control de FPS)
+	//Coherente con el tiempo transcurrido (sin control de FPS)
 	static int hora_anterior = glutGet(GLUT_ELAPSED_TIME);
 	int hora_actual = glutGet(GLUT_ELAPSED_TIME);
 
@@ -124,6 +124,8 @@ void update() {
 
 	Vec3 w = player.getw();
 	posPlayer += Vec3(-w.x * speedForward * delta, -w.y * speedForward * delta, -w.z * speedForward * delta);
+
+	hora_anterior = hora_actual;
 	
 	glutPostRedisplay();
 }
@@ -136,6 +138,7 @@ void display()
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 	glPolygonMode(GL_FRONT, GL_FILL);
+	//glPolygonMode(GL_FRONT, GL_LINE);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
@@ -171,13 +174,27 @@ void display()
 	static GLfloat posicionEstrella[] = { 50,0,100,0}; //Direccional
 	glLightfv(GL_LIGHT0, GL_POSITION, posicionEstrella);
 
+	/*Faros posiciones*/
+	/*
+	glPushMatrix();
+	glTranslatef(faro1.x + posPlayer.x, faro1.y + posPlayer.y, faro1.z + posPlayer.z);
+	glutSolidSphere(0.2f, 8, 8);
+	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(faro2.x + posPlayer.x, faro2.y + posPlayer.y, faro2.z + posPlayer.z);
+	glutSolidSphere(0.2f, 8, 8);
+	glPopMatrix();
+	*/
+
+	/*Suelo*/
 	glMaterialfv(GL_FRONT, GL_DIFFUSE, GRISOSCURO);
 	glMaterialfv(GL_FRONT, GL_SPECULAR, GRISOSCURO);
 	glMaterialf(GL_FRONT, GL_SHININESS, 0);
 
 	glCallList(suelo);
 
-
+	/*Esfera*/
 	glMaterialfv(GL_FRONT, GL_DIFFUSE, AZUL);
 	glMaterialfv(GL_FRONT, GL_SPECULAR, AZUL);
 	glMaterialf(GL_FRONT, GL_SHININESS, 1000);
@@ -187,6 +204,7 @@ void display()
 	glutSolidSphere(5,50,50);
 	glPopMatrix();
 
+	/*Donut*/
 	glMaterialfv(GL_FRONT, GL_DIFFUSE, VERDE);
 	glMaterialfv(GL_FRONT, GL_SPECULAR, VERDE);
 	glMaterialf(GL_FRONT, GL_SHININESS, 1000);
@@ -196,6 +214,7 @@ void display()
 	glutSolidTorus(1, 5, 50,50);
 	glPopMatrix();
 
+	/*Taza*/
 	glMaterialfv(GL_FRONT, GL_DIFFUSE, ROJO);
 	glMaterialfv(GL_FRONT, GL_SPECULAR, ROJO);
 	glMaterialf(GL_FRONT, GL_SHININESS, 1000);
@@ -318,12 +337,18 @@ void onDrag(int x, int y) {
 
 void onPassiveMotiotion(int x, int y) {
 	static float pixel2grados = 0.01f;
+	glutWarpPointer(windowWidth / 2, windowHeight / 2);
+
+	//Giramos siendo coherentes con el tiempo
+	static int hora_anterior = glutGet(GLUT_ELAPSED_TIME);
+	int hora_actual = glutGet(GLUT_ELAPSED_TIME);
+	float delta = (hora_actual - hora_anterior)/100.0f;
 
 	girox = (y - yanterior) * pixel2grados;
 	giroy = (x - xanterior) * pixel2grados;
 
-	player.rotar(-girox, Vec3(player.getu()));
-	player.rotar(-giroy, Vec3(player.getv()));
+	player.rotar(-girox*delta, Vec3(player.getu()));
+	player.rotar(-giroy*delta, Vec3(player.getv()));
 
 	//xanterior = x;
 	//yanterior = y;
@@ -333,6 +358,7 @@ void onPassiveMotiotion(int x, int y) {
 
 	xanterior = windowWidth / 2;
 	yanterior = windowHeight / 2;
+	hora_anterior = hora_actual;
 }
 
 

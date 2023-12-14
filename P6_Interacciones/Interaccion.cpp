@@ -12,6 +12,7 @@
 #define PROYECTO "Interaccion"
 
 #include <iostream>	
+#include <string>	
 #include <codebase.h>
 
 using namespace std;
@@ -19,6 +20,7 @@ using namespace cb;
 
 //Listas de dibujo
 static GLuint suelo;
+static GLuint asteroide;
 
 //Globales
 const int DIM_PLATAFORMA = 200;
@@ -30,7 +32,9 @@ static float speedForward;
 static const float ACCELERATION = 0.1;
 static const float MAX_SPEED = 10;
 
-static Vec3 posPlayer;
+
+//Innecesario?
+//static Vec3 posPlayer;
 
 float girox; float giroy;
 
@@ -41,6 +45,8 @@ static int windowWidth;
 static int windowHeight;
 
 static bool luces = true;
+
+static const float resAsteroide = 10;
 
 // Funcion de inicializacion propia
 void init()
@@ -89,11 +95,10 @@ void init()
 	//glColor3f(1, 1, 1);
 
 	for (int i = 0; i < DIM_PLATAFORMA * VERTICES_POR_UNIDAD; i++) {
-		glBegin(GL_QUAD_STRIP);
+		glBegin(GL_TRIANGLE_STRIP);
+		glNormal3f(0, 0, 1);
 		for (int j = 0; j < DIM_PLATAFORMA * VERTICES_POR_UNIDAD; j++) {
-			glNormal3f(0, 0, 1);
 			glVertex3f((i-DIM_PLATAFORMA/2)/ float(VERTICES_POR_UNIDAD), (j - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), 0);
-			glNormal3f(0, 0, 1);
 			glVertex3f((i + 1 - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), (j - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), 0);
 		}
 		glEnd();
@@ -105,13 +110,65 @@ void init()
 
 	#pragma endregion
 
-	player.seto(Vec3(0, 0, 0));  //Posicion Local
+
+	#pragma region asteroide
+
+	asteroide = glGenLists(1);
+	glNewList(asteroide, GL_COMPILE);
+glPushAttrib(GL_ALL_ATTRIB_BITS);
+	//glColor3f(1, 1, 1);
+
+	float res = resAsteroide;
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+	float offset = 1;
+
+
+	for (int i = res-1; i >= 0; i--) {
+		glBegin(GL_TRIANGLE_STRIP);
+		for (int j = res-1; j >= 0-1; j--) {
+
+
+			Vec3 v1(
+				cos(j * 2 * PI / res) * sin(i * PI / res),
+				sin(j * 2 * PI / res) * sin(i * PI / res),
+				sin(i * PI / res - PI / 2)
+			);
+			v1 = v1 * offset;
+			glVertex3f(v1.x, v1.y, v1.z);
+			Vec3 n1 = v1.normalize();
+			glNormal3f(n1.x, n1.y, n1.z);
+
+			//offset = 1 + random(-0.1, 0.1);
+
+			Vec3 v2(
+				cos(j * 2 * PI / res) * sin((i + 1) * PI / res),
+				sin(j * 2 * PI / res) * sin((i + 1) * PI / res),
+				sin((i + 1) * PI / res - PI / 2)
+			);
+			v2 = v2 * offset;
+			glVertex3f(v2.x, v2.y, v2.z);
+			Vec3 n2 = v2.normalize();
+
+			glNormal3f(n2.x, n2.y, n2.z);
+		}
+		glEnd();
+	}
+
+
+	glPopAttrib();
+	glEndList();
+
+	#pragma endregion
+
+
+	//Inicialización del jugador/nave
+	player.seto(Vec3(0, 0, z0)); //Posicion
 	player.setu(Vec3(1, 0, 0));  //x
 	player.setw(Vec3(0, -1, 0)); //y
 	player.setv(Vec3(0, 0, 1));  //z
 	speedForward = 0;
-
-	posPlayer = Vec3(0,0,z0); //Posicion inicial global player
 }
 
 void update() {
@@ -123,10 +180,16 @@ void update() {
 	float delta = (hora_actual - hora_anterior) / 1000.0f;
 
 	Vec3 w = player.getw();
-	posPlayer += Vec3(-w.x * speedForward * delta, -w.y * speedForward * delta, -w.z * speedForward * delta);
+
+	//Al final funciona con el sistema de referencia
+	//posPlayer += Vec3(-w.x * speedForward * delta, -w.y * speedForward * delta, -w.z * speedForward * delta);
+
+	player.seto(player.geto() += Vec3(-w.x * speedForward * delta, -w.y * speedForward * delta, -w.z * speedForward * delta));
 
 	hora_anterior = hora_actual;
-	
+
+	//texto(10, 10, a.c_str());
+
 	glutPostRedisplay();
 }
 
@@ -148,13 +211,13 @@ void display()
 	****************************************************************/
 
 	Vec3 origen = player.geto();
-	origen += posPlayer;
+	//origen += posPlayer;
 
 	Vec3 lookAt = origen - player.getw(); //w
 	Vec3 up = player.getv();
 
-	Vec3 faro1 =  Vec3(0,0,0) + player.getu()*0.25f;
-	Vec3 faro2 =  Vec3(0,0,0) - player.getu()*0.25f;
+	Vec3 faro1 =  player.getu()*0.25f;
+	Vec3 faro2 =  player.getu()*-0.25f;
 
 	static GLfloat posFaro1[] = { faro1.x, faro1.y, faro1.z, 1 }; //PosSpot
 	glLightfv(GL_LIGHT1, GL_POSITION, posFaro1);
@@ -168,6 +231,7 @@ void display()
 	#pragma endregion
 
 	gluLookAt(origen.x, origen.y, origen.z, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z); //Desde el frente
+	//gluLookAt(5, -5, 5, origen.x, origen.y, origen.z, up.x, up.y, up.z); //Desde el frente
 
 	//ejes();
 
@@ -177,12 +241,12 @@ void display()
 	/*Faros posiciones*/
 	/*
 	glPushMatrix();
-	glTranslatef(faro1.x + posPlayer.x, faro1.y + posPlayer.y, faro1.z + posPlayer.z);
+	glTranslatef(faro1.x + origen.x, faro1.y + origen.y, faro1.z + origen.z);
 	glutSolidSphere(0.2f, 8, 8);
 	glPopMatrix();
 
 	glPushMatrix();
-	glTranslatef(faro2.x + posPlayer.x, faro2.y + posPlayer.y, faro2.z + posPlayer.z);
+	glTranslatef(faro2.x + origen.x, faro2.y + origen.y, faro2.z + origen.z);
 	glutSolidSphere(0.2f, 8, 8);
 	glPopMatrix();
 	*/
@@ -200,7 +264,7 @@ void display()
 	glMaterialf(GL_FRONT, GL_SHININESS, 1000);
 
 	glPushMatrix();
-	glTranslatef(0,10,0);
+	glTranslatef(0,30,0);
 	glutSolidSphere(5,50,50);
 	glPopMatrix();
 
@@ -224,6 +288,20 @@ void display()
 	glRotatef(90, 1, 0, 0);
 	glutSolidTeapot(5);
 	glPopMatrix();
+
+
+	glPushMatrix();
+	glTranslatef(0, 5, 0.5f);
+	glCallList(asteroide);
+	glPopMatrix();
+
+	/*
+	glPushMatrix();
+	glTranslatef(lookAt.x, lookAt.y, lookAt.z);
+	//player.drawGlobal();
+	//player.drawLocal();
+	glPopMatrix();
+	*/
 
 	glutSwapBuffers();
 }
@@ -274,7 +352,7 @@ void onKey(unsigned char tecla, int x, int y) {
 	default:
 		break;
 	}
-	glutPostRedisplay();
+	//glutPostRedisplay();
 
 }void onKeyUP(unsigned char tecla, int x, int y) {
 	switch (tecla) {
@@ -296,7 +374,7 @@ void onKey(unsigned char tecla, int x, int y) {
 	default:
 		break;
 	}
-	glutPostRedisplay();
+	//glutPostRedisplay();
 
 }
 void onClick(int boton, int estado, int x, int y) {

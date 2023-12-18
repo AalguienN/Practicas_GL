@@ -24,36 +24,44 @@ static GLuint asteroide;
 static GLuint plano;
 
 //Globales
-const int DIM_PLATAFORMA = 200;
+
+//Plataforma
+const int DIM_PLATAFORMA = 100;
 const int VERTICES_POR_UNIDAD = 4;
-static float z0 = 1;
+
+//Nave / Player
 static Sistema3d player;
-
-static float speedForward;
-static const float ACCELERATION = 0.2;
-static const float MAX_SPEED = 10;
-
-
-//Innecesario?
-//static Vec3 posPlayer;
-
-float girox; float giroy;
+static float z0 = 1;					//Altura inicial
+static float speedForward;				//Velocidad de la nave
+static const float ACCELERATION = 0.2;	//Aceleración de la nave
+static const float MAX_SPEED = 10;		//Velocidad máxima nave (delante y marcha atrás)
+//float girox; float giroy;				//
 
 static int xanterior;
 static int yanterior;
+
+static GLuint metal;
+static GLuint roca;
 
 static int windowWidth;
 static int windowHeight;
 
 static bool luces = true;
 
-static const int resAsteroide = 50;
+static const int resAsteroide = 5;
 static const float velIniAst = 1.0f; //Velocidad inicial de los asteroides
 static const Vec3 velIniAngularMax = 1.0f; //Velocidad inicial de los asteroides
-static const float max_dist_asteroides = 20;
-static const int numAsteroides = 100;
+static const float max_dist_asteroides = 100;
+static const int numAsteroides = 200;
 static const float SUPERFICIE_BASE = 1.0f;
-static const float SUPERFICIE_VARIACION = 0.01f;
+static const float SUPERFICIE_VARIACION = 0.04f;
+
+enum tipoAsteroide
+{
+	senoidal, aleatorio
+};
+
+static const tipoAsteroide tipoA = aleatorio;
 
 
 static Vec3 verticesAsteroide[(resAsteroide+2) * (resAsteroide+2)];
@@ -214,9 +222,28 @@ void init()
 
 	#pragma endregion
 
+
+
+	#pragma region Texturas
+	//Texturas
+	glGenTextures(1, &metal);
+	glBindTexture(GL_TEXTURE_2D, metal);
+	loadImageFile((char*) "metal_2.jpg");
+	glGenTextures(1, &roca);
+	glBindTexture(GL_TEXTURE_2D, roca);
+	loadImageFile((char*)"roca.jpg");
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	#pragma endregion
+
 	glEnable(GL_DEPTH_TEST);	//Profundidad
 	glEnable(GL_LIGHTING);		//Iluminación
 	glEnable(GL_NORMALIZE);
+	glShadeModel(GL_SMOOTH);
+	glEnable(GL_TEXTURE_2D);
+	glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SEPARATE_SPECULAR_COLOR);
 
 	#pragma region suelo lista
 
@@ -225,13 +252,18 @@ void init()
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	//glColor3f(1, 1, 1);
 
+	glBindTexture(GL_TEXTURE_2D, metal);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	//glTexEnvi(GL_TEX_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	for (int i = 0; i < DIM_PLATAFORMA * VERTICES_POR_UNIDAD - 1; i++) {
 		glBegin(GL_TRIANGLE_STRIP);
 		glNormal3f(0, 0, 1);
 		for (int j = 0; j < DIM_PLATAFORMA * VERTICES_POR_UNIDAD; j++) {
-			glTexCoord2f(i / (DIM_PLATAFORMA * VERTICES_POR_UNIDAD), j);
+			glTexCoord2f(float(i) / 8 / float(VERTICES_POR_UNIDAD), float(j) / 8 / float(VERTICES_POR_UNIDAD));
 			glVertex3f((i-DIM_PLATAFORMA/2)/ float(VERTICES_POR_UNIDAD), (j - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), 0);
-			glTexCoord2f((i+1) / (DIM_PLATAFORMA * VERTICES_POR_UNIDAD), j);
+			glTexCoord2f(float(i+1) / 8 / float(VERTICES_POR_UNIDAD), float(j) / 8 / float(VERTICES_POR_UNIDAD));
 			glVertex3f((i + 1 - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), (j - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), 0);
 		}
 		glEnd();
@@ -251,20 +283,37 @@ void init()
 	float offset;
 	offset = 1;
 
-	for (int i = 1; i < resAsteroide + 1; i++) {
-		for (int j = 1; j <= resAsteroide + 1; j++) {
-			//cout <<'('<< i << ',' << j <<')' << (i+1) * (resAsteroide) + j;
-			float a = (cos(j * 8 * 2 * PI / res) * SUPERFICIE_VARIACION + SUPERFICIE_BASE);
+	if (tipoA == senoidal)
+		for (int i = 1; i < resAsteroide + 1; i++) {
+			for (int j = 1; j <= resAsteroide + 1; j++) {
+				//cout <<'('<< i << ',' << j <<')' << (i+1) * (resAsteroide) + j;
+				float a = (cos(j * 8 * 2 * PI / res) * SUPERFICIE_VARIACION + SUPERFICIE_BASE);
 
-			verticesAsteroide[i * (resAsteroide+2) + j] = Vec3(
-				cos(j * 2 * PI / res) * a * sin(i * PI / res),
-				sin(j * 2 * PI / res) * a * sin(i * PI / res),
-				sin(i * PI / res - PI / 2)
-			) * offset;
+				verticesAsteroide[i * (resAsteroide+2) + j] = Vec3(
+					cos(j * 2 * PI / res) * a * sin(i * PI / res),
+					sin(j * 2 * PI / res) * a * sin(i * PI / res),
+					sin(i * PI / res - PI / 2)
+				) * offset;
+			}
+			//cout << endl;
+			offset = (cos(i * 8 * 2 * PI / res) * SUPERFICIE_VARIACION + SUPERFICIE_BASE);
 		}
-		//cout << endl;
-		offset = (cos(i * 8 * 2 * PI / res) * SUPERFICIE_VARIACION + SUPERFICIE_BASE);
-	}
+
+	if (tipoA == aleatorio)
+		for (int i = 1; i < resAsteroide + 1; i++) {
+			for (int j = 1; j <= resAsteroide + 1; j++) {
+				//cout <<'('<< i << ',' << j <<')' << (i+1) * (resAsteroide) + j;
+				float a = random(-1,1) * SUPERFICIE_VARIACION + SUPERFICIE_BASE;
+
+				verticesAsteroide[i * (resAsteroide + 2) + j] = Vec3(
+					cos(j * 2 * PI / res) * a * sin(i * PI / res),
+					sin(j * 2 * PI / res) * a * sin(i * PI / res),
+					sin(i * PI / res - PI / 2)
+				) * (random(-1, 1) * SUPERFICIE_VARIACION + SUPERFICIE_BASE);
+			}
+			//cout << endl;
+			offset = random(-1,1) * SUPERFICIE_VARIACION + SUPERFICIE_BASE;
+		}
 
 	//Derecha izquierda
 	for (int i = 1; i < resAsteroide + 1; i++) {
@@ -294,6 +343,18 @@ void init()
 
 	//glPolygonMode(GL_BACK, GL_LINE);
 
+
+	GLfloat df[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+	GLfloat sp[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, GRISCLARO);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, NEGRO);
+	glMaterialf(GL_FRONT, GL_SHININESS, 0);
+	glBindTexture(GL_TEXTURE_2D, roca);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
 	for (int i = 1; i < res; i++) {
 		glBegin(GL_TRIANGLE_STRIP);
 		for (int j = 1; j <= res + 1; j++) {
@@ -301,7 +362,6 @@ void init()
 			Vec3 v1 = verticesAsteroide[i * (resAsteroide+2) + j];
 			Vec3 v2 = verticesAsteroide[(i + 1) * (resAsteroide + 2) + j];
 			Vec3 v3 = verticesAsteroide[i * (resAsteroide+2) + j + 1];
-
 			Vec3 n2;
 			if (j == res+1)
 				n2 = (v3 - v1).cross(v2 - v1)*-1;
@@ -310,6 +370,7 @@ void init()
 
 			n2.normalize();
 			glNormal3f(n2.x, n2.y, n2.z);
+			glTexCoord2f(float(i) / resAsteroide, float(j) / resAsteroide);
 			glVertex3f(v2.x, v2.y, v2.z);
 			
 			Vec3 n1;
@@ -320,20 +381,24 @@ void init()
 
 			n1.normalize();
 			glNormal3f(n1.x, n1.y, n1.z);
+			glTexCoord2f(float(i+1) / resAsteroide, float(j) / resAsteroide);
 			glVertex3f(v1.x, v1.y, v1.z);
 		}
 		glEnd();
 	}
-	glBegin(GL_TRIANGLE_FAN);
-	glNormal3f(0, 0, -1);
-	glVertex3f(0,0,-1);
+	glBegin(GL_TRIANGLE_STRIP);
+	
 	for (int j = res + 1; j >= 1; j--) {
 		//float a = (cos(j * 8 * 2 * PI / res) * 0.1 + 0.9);
-		Vec3 v1 = verticesAsteroide[(resAsteroide+1) * (resAsteroide + 2) + j];
 
+		glNormal3f(0, 0, -1);
+		glTexCoord2f(float((resAsteroide + 2) + 1) / resAsteroide, 0);
+		glVertex3f(0, 0, -1);
+		Vec3 v1 = verticesAsteroide[(resAsteroide+1) * (resAsteroide + 2) + j];
 		Vec3 n1 = v1;
 		n1.normalize();
 		glNormal3f(n1.x, n1.y, n1.z);
+		glTexCoord2f(float((resAsteroide + 1) + 1) / resAsteroide, float(j) / resAsteroide);
 		glVertex3f(v1.x, v1.y, v1.z);
 	}
 	glEnd();
@@ -533,9 +598,10 @@ void display()
 	
 	*/
 	glPushMatrix();
-	glTranslatef(0, 2, 1);
+	glTranslatef(0, 2, 2);
 	glCallList(asteroide);
 	glPopMatrix();
+
 
 	for (int i = 0; i < numAsteroides; i++) {
 		asteroides[i].Dibujar();
@@ -668,8 +734,8 @@ void onPassiveMotiotion(int x, int y) {
 	int hora_actual = glutGet(GLUT_ELAPSED_TIME);
 	float delta = (hora_actual - hora_anterior)/100.0f;
 
-	girox = (y - yanterior) * pixel2grados;
-	giroy = (x - xanterior) * pixel2grados;
+	float girox = (y - yanterior) * pixel2grados;
+	float giroy = (x - xanterior) * pixel2grados;
 
 	player.rotar(-girox*delta, player.getu());
 	player.rotar(-giroy*delta, player.getv());

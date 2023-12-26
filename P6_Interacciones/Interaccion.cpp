@@ -14,178 +14,67 @@
 #include <iostream>	
 #include <string>	
 #include <codebase.h>
+#include "Asteroide.h"
+#include "Blaster.h"
+#include "globales.h"
 
 using namespace std;
 using namespace cb;
+using namespace asteroideNS;
+using namespace blasterNS;
 
-//Listas de dibujo
-static GLuint suelo;
-static GLuint asteroide;
-static GLuint plano;
+//Globales ---------------------------------------------------------------------------
+static int windowWidth;
+static int windowHeight;
 
-//Globales
+//Listas de dibujo -------------------------------------------------------------------
+static GLuint suelo, asteroide, plano, nave;
 
-//Plataforma
+//Plataforma -------------------------------------------------------------------------
 const int DIM_PLATAFORMA = 100;
 const int VERTICES_POR_UNIDAD = 4;
 
-//Nave / Player
-static Sistema3d player;
+static Sistema3d primeraPersona;
+static Sistema3d cabinaPrimeraPersona;
+
+//Nave / Player ----------------------------------------------------------------------
+//static Sistema3d player;
 static float z0 = 1;					//Altura inicial
-static float speedForward;				//Velocidad de la nave
-static const float ACCELERATION = 0.2;	//Aceleración de la nave
-static const float MAX_SPEED = 10;		//Velocidad máxima nave (delante y marcha atrás)
-//float girox; float giroy;				//
+//static float speed_Player;				//Velocidad de la nave
+static const float ACCELERATION = 0.5;	//Aceleración de la nave
+static const float MAX_SPEED = 100;		//Velocidad máxima nave (delante y marcha atrás)
+float offset_girox = 0; float offset_giroy = 0;		//  
+
+static bool mostrarCabina = true;
+static bool luces = true;
 
 static int xanterior;
 static int yanterior;
 
-static GLuint metal;
-static GLuint roca;
+static bool disparando = false;
+static const float CADENCIA_DISPARO = 500;
 
-static int windowWidth;
-static int windowHeight;
+enum tipoCamara { basica = 0, primera_persona = 1, tercera_persona = 2};
 
-static bool luces = true;
+static tipoCamara camaraActual = basica;
 
-static const int resAsteroide = 5;
-static const float velIniAst = 1.0f; //Velocidad inicial de los asteroides
-static const Vec3 velIniAngularMax = 1.0f; //Velocidad inicial de los asteroides
-static const float max_dist_asteroides = 100;
-static const int numAsteroides = 200;
-static const float SUPERFICIE_BASE = 1.0f;
-static const float SUPERFICIE_VARIACION = 0.04f;
+//Texturas ----------------------------------------------------------------------------
+static GLuint metal, roca, fondo, estrella, interiorNave, sofa;
 
 enum tipoAsteroide
 {
 	senoidal, aleatorio
 };
 
-static const tipoAsteroide tipoA = aleatorio;
+static const tipoAsteroide tipoA = senoidal;
+
+static Vec3 verticesAsteroide[(RES_ASTEROIDE+2) * (RES_ASTEROIDE+2)];
 
 
-static Vec3 verticesAsteroide[(resAsteroide+2) * (resAsteroide+2)];
 
-Vec3 randomVec() {
-	
-	return Vec3(random(-1, 1), random(-1, 1), random(-1, 1));
-}
+static int blasterActual = 0;
 
-class Asteroide {
-private:
-	Vec3 position;
-	Vec3 velocidad;
-	Vec3 rotacion;
-	Vec3 velocidadAngular;
-	Vec3 escala;
-	Vec3 rotAcionInterna;
-	//Radio de cada punto del asteroide respecto a su centro
-	Vec3 verticesAsteroide[(resAsteroide+2) * (resAsteroide+2)];
-	//Resolución
-	float resolucion;
-	
-public:
-	Asteroide(
-		Vec3 position = randomVec() * max_dist_asteroides,
-		Vec3 velocidad = randomVec()* velIniAst,
-		Vec3 rotacion = randomVec() * 180.f,
-		Vec3 velocidadAngular = randomVec() * 1,
-		Vec3 escala = Vec3(1,1,1) + randomVec() * 0.5,
-		int res = resAsteroide) :
-		position(position), velocidad(velocidad), 
-		rotacion(rotacion), velocidadAngular(velocidadAngular),
-		escala(escala),
-		verticesAsteroide(), resolucion(res) ,
-		rotAcionInterna(randomVec()*180.f)
-	{
-		SetOffset();
-		cout << velocidadAngular.x << velocidadAngular.y << velocidadAngular.z << endl;
-	};
-	void SetOffset() {
-	}
-	void SetOffset(GLfloat va[resAsteroide * resAsteroide]) {
-		cout << "Seteando offset de asteroide ..." << this << endl;
-		for (int i = 0; i < resAsteroide * resAsteroide; i++) {
-			this->verticesAsteroide[i] = va[i];
-		}
-	}
-	void Dibujar() {
-		glPushMatrix();
-		glTranslatef(position.x,position.y, position.z);
-		glRotatef(rotacion.x, 1,0,0);
-		glRotatef(rotacion.y, 0,1,0);
-		glRotatef(rotacion.z, 0,0,1);
-		glScalef(escala.x, escala.y, escala.z);
-		glRotatef(rotAcionInterna.x, 1, 0, 0);
-		glRotatef(rotAcionInterna.y, 0, 1, 0);
-		glRotatef(rotAcionInterna.z, 0, 0, 1);
-		glCallList(asteroide);
-		
-		glPopMatrix();
-		/*
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		float res = this -> resolucion;
-
-
-		glPolygonMode(GL_BACK, GL_LINE);
-
-		int pos = 0;
-
-		//Opción arreglar : Meter plano de corte
-
-		for (int i = 0; i < res; i++) {
-			glBegin(GL_TRIANGLE_STRIP);
-			for (int j = 0; j <= res; j++) {
-
-				Vec3 v2(
-					cos(j * 2 * PI / res) * sin((i + 1) * PI / res),
-					sin(j * 2 * PI / res) * sin((i + 1) * PI / res),
-					sin((i + 1) * PI / res - PI / 2)
-				);
-				Vec3 n2 = v2;
-				n2.normalize();
-				glNormal3f(n2.x, n2.y, n2.z);
-				pos = (i+1) * res + j;
-				v2 = v2 * offset[pos];
-				glVertex3f(v2.x, v2.y, v2.z);
-
-
-				Vec3 v1(
-					cos(j * 2 * PI / res) * sin(i * PI / res),
-					sin(j * 2 * PI / res) * sin(i * PI / res),
-					sin(i * PI / res - PI / 2)
-				);
-				Vec3 n1 = v1;
-				n1.normalize();
-				glNormal3f(n1.x, n1.y, n1.z);
-				pos = i * res + j;
-				v1 = v1 * offset[pos];
-				glVertex3f(v1.x, v1.y, v1.z);
-			}
-
-			glEnd();
-		}
-
-
-		glPopAttrib();
-		*/
-	}
-	Vec3 getPos() { return this->position; }
-	void updatePos(float tiempo) { 
-		this->position += this->velocidad * tiempo; 
-		if (this->position.z < 0) {
-			this->velocidad = Vec3(random(-velIniAst, velIniAst), random(-velIniAst, velIniAst), random(-velIniAst, velIniAst));
-			this->position = Vec3(position.x, position.y, 0);
-		} 
-		if ((this->position - player.geto()).norm() > max_dist_asteroides) {
-			this->position = Vec3(random(-1, 1), random(-1, 1), random(-1, 1)).normalize() * max_dist_asteroides * 0.99f + player.geto();
-			this->velocidad = Vec3(random(-velIniAst, velIniAst), random(-velIniAst, velIniAst), random(-velIniAst, velIniAst));
-		}
-		this->rotacion += velocidadAngular;
-	}
-};
-
-static Asteroide asteroides[numAsteroides];
+static Asteroide asteroides[NUM_ASTEROIDES];
 
 // Funcion de inicializacion propia
 void init()
@@ -219,10 +108,28 @@ void init()
 	glEnable(GL_LIGHT1);
 	glEnable(GL_LIGHT2);
 
+	// BLASTERS
+	glLightfv(GL_LIGHT3, GL_AMBIENT, NEGRO);
+	glLightfv(GL_LIGHT3, GL_DIFFUSE, GRISCLARO);
+	glLightfv(GL_LIGHT3, GL_SPECULAR, GRISCLARO);
 
+	glLightfv(GL_LIGHT4, GL_AMBIENT, NEGRO);
+	glLightfv(GL_LIGHT4, GL_DIFFUSE, GRISCLARO);
+	glLightfv(GL_LIGHT4, GL_SPECULAR, GRISCLARO);
+
+	glLightfv(GL_LIGHT5, GL_AMBIENT, NEGRO);
+	glLightfv(GL_LIGHT5, GL_DIFFUSE, GRISCLARO);
+	glLightfv(GL_LIGHT5, GL_SPECULAR, GRISCLARO);
+
+	glLightfv(GL_LIGHT6, GL_AMBIENT, NEGRO);
+	glLightfv(GL_LIGHT6, GL_DIFFUSE, GRISCLARO);
+	glLightfv(GL_LIGHT6, GL_SPECULAR, GRISCLARO);
+
+	//glEnable(GL_LIGHT3);
+	//glEnable(GL_LIGHT4);
+	//glEnable(GL_LIGHT5);
+	//glEnable(GL_LIGHT6);
 	#pragma endregion
-
-
 
 	#pragma region Texturas
 	//Texturas
@@ -233,17 +140,42 @@ void init()
 	glBindTexture(GL_TEXTURE_2D, roca);
 	loadImageFile((char*)"roca.jpg");
 
+	glGenTextures(1, &fondo);
+	glBindTexture(GL_TEXTURE_2D, fondo);
+	loadImageFile((char*)"fondo.jpg");
+
+	glGenTextures(1, &estrella);
+	glBindTexture(GL_TEXTURE_2D, estrella);
+	loadImageFile((char*)"estrella.jpg");
+
+	glGenTextures(1, &interiorNave);
+	glBindTexture(GL_TEXTURE_2D, interiorNave);
+	loadImageFile((char*)"interior_panoramica.png");
+
+	glGenTextures(1, &sofa);
+	glBindTexture(GL_TEXTURE_2D, sofa);
+	loadImageFile((char*)"sofa.jpg");
+	
+
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	#pragma endregion
 
+	#pragma region Enable
 	glEnable(GL_DEPTH_TEST);	//Profundidad
 	glEnable(GL_LIGHTING);		//Iluminación
 	glEnable(GL_NORMALIZE);
 	glShadeModel(GL_SMOOTH);
 	glEnable(GL_TEXTURE_2D);
 	glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SEPARATE_SPECULAR_COLOR);
+
+	//Blending
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+	#pragma endregion
 
 	#pragma region suelo lista
 
@@ -279,17 +211,17 @@ void init()
 
 	#pragma region iniAsteroide
 
-	float res = resAsteroide;
+	float res = RES_ASTEROIDE;
 	float offset;
 	offset = 1;
 
 	if (tipoA == senoidal)
-		for (int i = 1; i < resAsteroide + 1; i++) {
-			for (int j = 1; j <= resAsteroide + 1; j++) {
-				//cout <<'('<< i << ',' << j <<')' << (i+1) * (resAsteroide) + j;
+		for (int i = 1; i < RES_ASTEROIDE + 1; i++) {
+			for (int j = 1; j <= RES_ASTEROIDE + 1; j++) {
+				//cout <<'('<< i << ',' << j <<')' << (i+1) * (RES_ASTEROIDE) + j;
 				float a = (cos(j * 8 * 2 * PI / res) * SUPERFICIE_VARIACION + SUPERFICIE_BASE);
 
-				verticesAsteroide[i * (resAsteroide+2) + j] = Vec3(
+				verticesAsteroide[i * (RES_ASTEROIDE+2) + j] = Vec3(
 					cos(j * 2 * PI / res) * a * sin(i * PI / res),
 					sin(j * 2 * PI / res) * a * sin(i * PI / res),
 					sin(i * PI / res - PI / 2)
@@ -300,12 +232,12 @@ void init()
 		}
 
 	if (tipoA == aleatorio)
-		for (int i = 1; i < resAsteroide + 1; i++) {
-			for (int j = 1; j <= resAsteroide + 1; j++) {
-				//cout <<'('<< i << ',' << j <<')' << (i+1) * (resAsteroide) + j;
+		for (int i = 1; i < RES_ASTEROIDE + 1; i++) {
+			for (int j = 1; j <= RES_ASTEROIDE + 1; j++) {
+				//cout <<'('<< i << ',' << j <<')' << (i+1) * (RES_ASTEROIDE) + j;
 				float a = random(-1,1) * SUPERFICIE_VARIACION + SUPERFICIE_BASE;
 
-				verticesAsteroide[i * (resAsteroide + 2) + j] = Vec3(
+				verticesAsteroide[i * (RES_ASTEROIDE + 2) + j] = Vec3(
 					cos(j * 2 * PI / res) * a * sin(i * PI / res),
 					sin(j * 2 * PI / res) * a * sin(i * PI / res),
 					sin(i * PI / res - PI / 2)
@@ -316,19 +248,19 @@ void init()
 		}
 
 	//Derecha izquierda
-	for (int i = 1; i < resAsteroide + 1; i++) {
-		verticesAsteroide[i * (resAsteroide + 2)] = verticesAsteroide[i * (resAsteroide + 2) + resAsteroide];
-		verticesAsteroide[i * (resAsteroide + 2) + resAsteroide + 1] = verticesAsteroide[i * (resAsteroide + 2) + 1];
+	for (int i = 1; i < RES_ASTEROIDE + 1; i++) {
+		verticesAsteroide[i * (RES_ASTEROIDE + 2)] = verticesAsteroide[i * (RES_ASTEROIDE + 2) + RES_ASTEROIDE];
+		verticesAsteroide[i * (RES_ASTEROIDE + 2) + RES_ASTEROIDE + 1] = verticesAsteroide[i * (RES_ASTEROIDE + 2) + 1];
 	}
 	//Arriba abajo
-	for (int j = 1; j < resAsteroide + 1; j++) {
-		verticesAsteroide[j] = verticesAsteroide[(resAsteroide) * (resAsteroide + 2) + j];
-		verticesAsteroide[(resAsteroide + 1) * (resAsteroide + 2) + j] = verticesAsteroide[resAsteroide + 2 + j];
+	for (int j = 1; j < RES_ASTEROIDE + 1; j++) {
+		verticesAsteroide[j] = verticesAsteroide[(RES_ASTEROIDE) * (RES_ASTEROIDE + 2) + j];
+		verticesAsteroide[(RES_ASTEROIDE + 1) * (RES_ASTEROIDE + 2) + j] = verticesAsteroide[RES_ASTEROIDE + 2 + j];
 	}
 	//Esquinas
-	verticesAsteroide[0] = verticesAsteroide[(resAsteroide) * (resAsteroide + 2)];
-	verticesAsteroide[(resAsteroide + 1) * (resAsteroide + 2) + resAsteroide + 1] = verticesAsteroide[(resAsteroide + 2) + 1];
-	verticesAsteroide[(resAsteroide + 1) * (resAsteroide + 2)] = verticesAsteroide[(resAsteroide + 2) + resAsteroide+1];
+	verticesAsteroide[0] = verticesAsteroide[(RES_ASTEROIDE) * (RES_ASTEROIDE + 2)];
+	verticesAsteroide[(RES_ASTEROIDE + 1) * (RES_ASTEROIDE + 2) + RES_ASTEROIDE + 1] = verticesAsteroide[(RES_ASTEROIDE + 2) + 1];
+	verticesAsteroide[(RES_ASTEROIDE + 1) * (RES_ASTEROIDE + 2)] = verticesAsteroide[(RES_ASTEROIDE + 2) + RES_ASTEROIDE+1];
 	#pragma endregion
 
 	#pragma region asteroide
@@ -339,7 +271,7 @@ void init()
 	//glColor3f(1, 1, 1);
 
 	// Dibujar ---------------------------------------------------------------------
-	res = resAsteroide;
+	res = RES_ASTEROIDE;
 
 	//glPolygonMode(GL_BACK, GL_LINE);
 
@@ -359,9 +291,9 @@ void init()
 		glBegin(GL_TRIANGLE_STRIP);
 		for (int j = 1; j <= res + 1; j++) {
 			//float a = (cos(j * 8 * 2 * PI / res) * 0.1 + 0.9);
-			Vec3 v1 = verticesAsteroide[i * (resAsteroide+2) + j];
-			Vec3 v2 = verticesAsteroide[(i + 1) * (resAsteroide + 2) + j];
-			Vec3 v3 = verticesAsteroide[i * (resAsteroide+2) + j + 1];
+			Vec3 v1 = verticesAsteroide[i * (RES_ASTEROIDE+2) + j];
+			Vec3 v2 = verticesAsteroide[(i + 1) * (RES_ASTEROIDE + 2) + j];
+			Vec3 v3 = verticesAsteroide[i * (RES_ASTEROIDE+2) + j + 1];
 			Vec3 n2;
 			if (j == res+1)
 				n2 = (v3 - v1).cross(v2 - v1)*-1;
@@ -370,7 +302,7 @@ void init()
 
 			n2.normalize();
 			glNormal3f(n2.x, n2.y, n2.z);
-			glTexCoord2f(float(i) / resAsteroide, float(j) / resAsteroide);
+			glTexCoord2f(float(i) / RES_ASTEROIDE, float(j) / RES_ASTEROIDE);
 			glVertex3f(v2.x, v2.y, v2.z);
 			
 			Vec3 n1;
@@ -381,7 +313,7 @@ void init()
 
 			n1.normalize();
 			glNormal3f(n1.x, n1.y, n1.z);
-			glTexCoord2f(float(i+1) / resAsteroide, float(j) / resAsteroide);
+			glTexCoord2f(float(i+1) / RES_ASTEROIDE, float(j) / RES_ASTEROIDE);
 			glVertex3f(v1.x, v1.y, v1.z);
 		}
 		glEnd();
@@ -392,13 +324,13 @@ void init()
 		//float a = (cos(j * 8 * 2 * PI / res) * 0.1 + 0.9);
 
 		glNormal3f(0, 0, -1);
-		glTexCoord2f(float((resAsteroide + 2) + 1) / resAsteroide, 0);
+		glTexCoord2f(float((RES_ASTEROIDE + 2) + 1) / RES_ASTEROIDE, 0);
 		glVertex3f(0, 0, -1);
-		Vec3 v1 = verticesAsteroide[(resAsteroide+1) * (resAsteroide + 2) + j];
+		Vec3 v1 = verticesAsteroide[(RES_ASTEROIDE+1) * (RES_ASTEROIDE + 2) + j];
 		Vec3 n1 = v1;
 		n1.normalize();
 		glNormal3f(n1.x, n1.y, n1.z);
-		glTexCoord2f(float((resAsteroide + 1) + 1) / resAsteroide, float(j) / resAsteroide);
+		glTexCoord2f(float((RES_ASTEROIDE + 1) + 1) / RES_ASTEROIDE, float(j) / RES_ASTEROIDE);
 		glVertex3f(v1.x, v1.y, v1.z);
 	}
 	glEnd();
@@ -408,7 +340,6 @@ void init()
 
 	#pragma endregion
 
-
 	#pragma region plano
 
 	plano = glGenLists(1);
@@ -416,7 +347,7 @@ void init()
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	//glColor3f(1, 1, 1);
 
-	res = resAsteroide;
+	res = RES_ASTEROIDE;
 
 	//glPolygonMode(GL_BACK, GL_LINE);
 
@@ -464,13 +395,42 @@ void init()
 
 	#pragma endregion
 
+	#pragma region nave
+
+	nave = glGenLists(1);
+	glNewList(nave, GL_COMPILE);
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	//glColor3f(1, 1, 1);
+
+	res = RES_ASTEROIDE;
+
+	//glPolygonMode(GL_BACK, GL_LINE);
+
+
+	
+
+
+	glPopAttrib();
+	glEndList();
+
+	#pragma endregion
 
 	//Inicialización del jugador/nave
 	player.seto(Vec3(0, 0, z0)); //Posicion
 	player.setu(Vec3(1, 0, 0));  //x
 	player.setw(Vec3(0, -1, 0)); //y
 	player.setv(Vec3(0, 0, 1));  //z
-	speedForward = 0;
+	speed_Player = 0;
+
+	primeraPersona.setu(Vec3(1, 0, 0));  //x
+	primeraPersona.setw(Vec3(0, -1, 0)); //y
+	primeraPersona.setv(Vec3(0, 0, 1));  //z
+}
+
+//Diferencia entre 2 álgulos
+// https://stackoverflow.com/questions/21622956/how-to-convert-direction-vector-to-euler-angles
+void lcs2Euler(){
+
 
 }
 
@@ -485,12 +445,16 @@ void update() {
 	Vec3 w = player.getw();
 
 	//Al final funciona con el sistema de referencia
-	//posPlayer += Vec3(-w.x * speedForward * delta, -w.y * speedForward * delta, -w.z * speedForward * delta);
+	//posPlayer += Vec3(-w.x * speed_Player * delta, -w.y * speed_Player * delta, -w.z * speed_Player * delta);
 
-	player.seto(player.geto() += Vec3(-w.x * speedForward * delta, -w.y * speedForward * delta, -w.z * speedForward * delta));
+	player.seto(player.geto() += Vec3(-w.x * speed_Player * delta, -w.y * speed_Player * delta, -w.z * speed_Player * delta));
 
-	for (int i = 0; i < numAsteroides; i++) {
-		asteroides[i].updatePos(delta);
+	for (int i = 0; i < NUM_ASTEROIDES; i++) {
+		asteroides[i].Actualizar(delta);
+	}
+
+	for (int i = 0; i < NUM_BLASTERS; i++) {
+		blasters[i].Actualizar(delta);
 	}
 
 	hora_anterior = hora_actual;
@@ -500,6 +464,195 @@ void update() {
 	glutPostRedisplay();
 }
 
+void cubemap(GLfloat posicionEstrella[3], GLuint textura, bool dibujarEstrella) {
+
+	glDisable(GL_LIGHTING);
+	glPushMatrix();
+	
+	glBindTexture(GL_TEXTURE_2D, estrella);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glMaterialf(GL_FRONT, GL_SHININESS, 0);
+
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+	glEnable(GL_TEXTURE_GEN_S);
+	glEnable(GL_TEXTURE_GEN_T);
+	static float planoS[] = { 1,0,0,0 };
+	static float planoT[] = { 0,0,1,0 };
+	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGenfv(GL_S, GL_OBJECT_PLANE, planoS);
+	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGenfv(GL_T, GL_OBJECT_PLANE, planoT);
+
+	Vec3 posEstrella(posicionEstrella[0], posicionEstrella[1], posicionEstrella[2]);
+	posEstrella.normalize();
+	posEstrella = posEstrella * 0.5f;
+	glPushMatrix();
+	glTranslatef(posEstrella.x, posEstrella.y, posEstrella.z);
+	if (dibujarEstrella)
+	glutSolidSphere(0.05f, 20, 20);
+	//glutSolidTeapot(0.05f);
+	glDisable(GL_TEXTURE_GEN_S);
+	glDisable(GL_TEXTURE_GEN_T);
+	glPopMatrix();
+	
+
+
+	glBindTexture(GL_TEXTURE_2D, textura);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	int caras[] = { 7,2,5,10,6,4 };
+
+	for (int i = 0; i < 4; i++) {
+		glPushMatrix();
+		glRotatef(90 * i, 0, 0, 1);
+		glTranslatef(0, 0.5f, 0);
+		glRotatef(90 * i, 0, 1, 0);
+		glTranslatef(-0.5f, 0, -0.5f);
+
+		glBegin(GL_TRIANGLE_STRIP);
+		GLfloat p[] = { float(caras[i] / 4) * 1 / 3.f, float(caras[i] % 4) * 1 / 4.f };
+		glTexCoord2f(p[0], p[1]);
+		glVertex3f(0, 0, 0);
+		glTexCoord2f(1 / 3.f + p[0], p[1]);
+		glVertex3f(1, 0, 0);
+		glTexCoord2f(p[0], 1 / 4.f + p[1]);
+		glVertex3f(0, 0, 1);
+		glTexCoord2f(1 / 3.f + p[0], 1 / 4.f + p[1]);
+		glVertex3f(1, 0, 1);
+		glEnd();
+		glPopMatrix();
+	}
+
+	for (int i = 4; i < 6; i++) {
+		glPushMatrix();
+		glTranslatef(-0.5f, -0.5f + 1, -0.5f);
+
+		glTranslatef(0, 0, i - 4);
+		glRotatef(180 * i, 1, 0, 0);
+		glRotatef(90 + 180, 1, 0, 0);
+
+		glTranslatef(0, 0, (i - 4) - 1);
+		glBegin(GL_TRIANGLE_STRIP);
+		GLfloat p[] = { float(caras[i] / 4) * 1 / 3.f, float(caras[i] % 4) * 1 / 4.f };
+		glTexCoord2f(p[0], p[1]);
+		glVertex3f(0, 0, 0);
+		glTexCoord2f(1 / 3.f + p[0], p[1]);
+		glVertex3f(1, 0, 0);
+		glTexCoord2f(p[0], 1 / 4.f + p[1]);
+		glVertex3f(0, 0, 1);
+		glTexCoord2f(1 / 3.f + p[0], 1 / 4.f + p[1]);
+		glVertex3f(1, 0, 1);
+		glEnd();
+		glPopMatrix();
+	}
+	glEnable(GL_LIGHTING);
+	glPopMatrix();
+}
+void cabina(GLuint textura) {
+	if (mostrarCabina) {
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glDisable(GL_LIGHTING);
+		glEnable(GL_DEPTH_TEST);	//Profundidad
+
+		glPushMatrix();
+		glLoadIdentity();
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glLoadIdentity();
+		//glOrtho(-1, 1, -1, 1, -1, 1);
+		gluPerspective(90, 1, 0.1, 2);
+		glMatrixMode(GL_MODELVIEW);
+
+		Vec3 lookAt;
+		Vec3 up;
+		up = Vec3(0, 0, 1);
+
+		if (camaraActual == basica) {
+			lookAt = Vec3(0, 1, 0);
+			//up = Vec3(0, 0, 1);
+		}
+
+		//lookAt = player.getw() * -1;
+		else if (camaraActual == primera_persona) {
+			lookAt = cabinaPrimeraPersona.getw() * -1;
+			//up = cabinaPrimeraPersona.getv();
+		}
+
+		gluLookAt(0, 0, 0, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z);
+
+
+		glBindTexture(GL_TEXTURE_2D, textura);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+		if (camaraActual == primera_persona) {
+			glRotatef(offset_girox * 360 / 2 / PI, 1, 0, 0);
+			glRotatef(offset_giroy * 360 / 2 / PI, 0, 1, 0);
+		}
+
+
+		glBindTexture(GL_TEXTURE_2D, sofa);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+		glMaterialf(GL_FRONT, GL_SHININESS, 0);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+		glEnable(GL_TEXTURE_GEN_S);
+		glEnable(GL_TEXTURE_GEN_T);
+		static float planoS[] = { 0,5,0,0 };
+		static float planoT[] = { 5,0,0,0 };
+		glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+		glTexGenfv(GL_S, GL_OBJECT_PLANE, planoS);
+		glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+		glTexGenfv(GL_T, GL_OBJECT_PLANE, planoT);
+
+		glPushMatrix();
+		glTranslatef(0, -0.1f, 0);
+		glPushMatrix();
+		glTranslatef(0, 0, -0.25f);
+		glScalef(1.5f, 1.25f, 0.5f);
+		glutSolidCube(0.2f);
+		glPopMatrix();
+
+		static float planoS_[] = { 0,0,5,0 };
+		static float planoT_[] = { 5,0,0,0 };
+		glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+		glTexGenfv(GL_S, GL_OBJECT_PLANE, planoS_);
+		glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+		glTexGenfv(GL_T, GL_OBJECT_PLANE, planoT_);
+
+		glPushMatrix();
+		glTranslatef(0.0f, -0.2f, -0.1f);
+		glScalef(1.5f, 0.5f, 1.0f);
+		glutSolidCube(0.2f);
+		glPopMatrix();
+		glPopMatrix();
+		
+		//glutSolidTeapot(0.05f);
+		glDisable(GL_TEXTURE_GEN_S);
+		glDisable(GL_TEXTURE_GEN_T);
+
+
+		glRotatef(-90, 1, 0, 0);
+		glRotatef(180, 0, 1, 0);
+		glRotatef(90, 0, 0, 1);
+		cubemap(Vec3(0, 0, 0), textura, false);
+
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPopMatrix();
+		glPopAttrib();
+	}
+}
 // Funcion de atencion al evento de dibujo
 void display()
 {
@@ -517,11 +670,26 @@ void display()
 	*	 Posiciones de los faros									*
 	****************************************************************/
 
+	
 	Vec3 origen = player.geto();
 	//origen += posPlayer;
 
-	Vec3 lookAt = origen - player.getw(); //w
-	Vec3 up = player.getv();
+	Vec3 lookAt = origen - player.getw();;
+	Vec3 up;
+	/*
+	
+	*/
+	if (camaraActual == basica) {
+		lookAt = origen - player.getw(); //w
+		up = player.getv();
+	
+	}
+
+	else if (camaraActual == primera_persona) {
+		lookAt = origen - primeraPersona.getw();
+		up = primeraPersona.getv();
+	}
+	
 
 	Vec3 faro1 =  player.getu()*0.25f;
 	Vec3 faro2 =  player.getu()*-0.25f;
@@ -597,15 +765,118 @@ void display()
 	glPopMatrix();	
 	
 	*/
-	glPushMatrix();
-	glTranslatef(0, 2, 2);
-	glCallList(asteroide);
-	glPopMatrix();
+	//glPushMatrix();
+	//glTranslatef(0, 2, 2);
+	//glCallList(asteroide);
+	//glPopMatrix();
 
 
-	for (int i = 0; i < numAsteroides; i++) {
+	for (int i = 0; i < NUM_ASTEROIDES; i++) {
 		asteroides[i].Dibujar();
 	}
+
+	for (int i = 0; i < NUM_BLASTERS; i++) {
+		blasters[i].Dibujar();
+	}
+	
+	//Luz de los blasters
+	/*
+	if (blasters[0].isAlive()) {
+		glEnable(GL_LIGHT3);
+		Vec3 b_pos = asteroides[0].getPos();
+		static GLfloat pos1[] = { b_pos.x, b_pos.y, b_pos.z, 1.0}; //PosSpot
+		glLightfv(GL_LIGHT3, GL_POSITION, pos1);
+	}
+	else { glDisable(GL_LIGHT3); }
+
+	if (blasters[1].isAlive()) {
+		glEnable(GL_LIGHT4);
+		Vec3 b_pos = asteroides[1].getPos();
+		static GLfloat pos2[] = { b_pos.x, b_pos.y, b_pos.z, 1.0 }; //PosSpot
+		glLightfv(GL_LIGHT4, GL_POSITION, pos2);
+	}
+	else { glDisable(GL_LIGHT4); }
+
+	if (blasters[2].isAlive()) {
+		glEnable(GL_LIGHT5);
+		Vec3 b_pos = asteroides[2].getPos();
+		static GLfloat pos3[] = { b_pos.x, b_pos.y, b_pos.z, 1.0 }; //PosSpot
+		glLightfv(GL_LIGHT5, GL_POSITION, pos3);
+	}
+	else { glDisable(GL_LIGHT5); }
+
+	if (blasters[3].isAlive()) {
+		glEnable(GL_LIGHT6);
+		Vec3 b_pos = asteroides[3].getPos();
+		static GLfloat pos4[] = { b_pos.x, b_pos.y, b_pos.z, 1.0 }; //PosSpot
+		glLightfv(GL_LIGHT6, GL_POSITION, pos4);
+	}
+	else { glDisable(GL_LIGHT6); }
+	*/
+	
+
+	#pragma region cubemap
+	glPushMatrix();
+	glTranslatef(origen.x, origen.y, origen.z);
+	glScalef(9000, 9000, 9000);
+	cubemap(posicionEstrella, fondo, true);
+	glPopMatrix();
+	
+	#pragma endregion
+	/*
+		glPushMatrix();
+	glPushMatrix();
+	glPopMatrix();
+	glTranslatef(lookAt.x,lookAt.y,lookAt.z);
+	player.drawLocal();
+	//player.drawGlobal();
+	//ejes();
+	glPopMatrix();
+
+	glEnable(GL_LIGHTING);
+
+	// PROBLEMAS! EN OBRAS!
+	//glBindTexture(GL_TEXTURE_2D, interiorNave);
+	glPushMatrix();
+	Vec3 vecDir = player.getw() * -1;
+	Vec3 vecUp = player.getv();
+	
+	// https://stackoverflow.com/questions/42554960/get-xyz-angles-between-vectors
+	float angulo = acos(Vec3(0, 1, 0).dot(vecDir));
+	Vec3 axis = Vec3(0, 1, 0).cross(vecDir);
+
+	Vec3 transFV(0,0,1);
+	transFV = transFV.rotate(angulo, axis);
+
+	float anguloUP = transFV.dot(vecUp);
+	cout << anguloUP * 360 / 2 / PI << endl;
+
+	glPushMatrix();
+	glTranslatef(lookAt.x, lookAt.y, lookAt.z);
+	glRotatef(angulo * 360 / 2 / PI, axis.x, axis.y, axis.z);
+
+	glutSolidCube(0.1f);
+	ejes();
+	glPopMatrix();
+
+	//cout << c << "|" << s << "|" << t << endl;
+
+	//cout << angulo << endl;
+	Vec3 rotV(0, 0, 0);
+	//rotV = vectorDirecionAAngulo(player.getw() * -1, player.getv());
+	//cout << rotV.x * 360 / (2 * PI) << "|" << rotV.y * 360 / (2 * PI) << "|" << rotV.z * 360 / (2 * PI) << endl;
+	glTranslatef(origen.x, origen.y, origen.z);
+	glRotatef(rotV.x * 360 / (2*PI), 1, 0, 0);
+	glRotatef(rotV.y * 360 / (2 * PI), 0, 1, 0);
+	glRotatef(rotV.z * 360 / (2 * PI), 0, 0, 1);
+	//cubemap(Vec3(0, 0, 0), interiorNave, false);
+	glPopMatrix();
+	*/
+
+
+
+	cabina(interiorNave);
+	
 
 	/*
 	glPushMatrix();
@@ -635,19 +906,33 @@ void reshape(GLint w, GLint h)
 	glLoadIdentity();
 
 	//gluPerspective(apertura vertical, raz n de aspecto (alto:ancho), distancia del plano cercano, distancia del plano alejado); 
-	gluPerspective(90, ra, 0.1, 1000);
+	gluPerspective(90, ra, 0.1, 10000);
 }
 
 
 void acelerar() {
 	//cout << "acelerando";
-	if (speedForward < MAX_SPEED)
-		speedForward += ACCELERATION; //Tiene que ser coerente con el tiempo FALTA
+	if (speed_Player < MAX_SPEED)
+		speed_Player += ACCELERATION; //Tiene que ser coerente con el tiempo FALTA
 }
 void frenar() {
 	//cout << "frenando";
-	if (speedForward > -MAX_SPEED)
-		speedForward -= ACCELERATION; //Tiene que ser coerente con el tiempo FALTA
+	if (speed_Player > -MAX_SPEED)
+		speed_Player -= ACCELERATION; //Tiene que ser coerente con el tiempo FALTA
+}
+void esperaDisparo(int n) {
+	disparando = false;
+}
+void disparar() {
+	//NOTA: Poner sonido gracioso (PIU)
+	if (!disparando) {
+		disparando = true;
+		cout << "PUM!" << endl;
+		blasters[blasterActual].Disparar();
+		blasterActual = (blasterActual + 1) % NUM_BLASTERS;
+		//Llamar aquí al blaster
+		glutTimerFunc(CADENCIA_DISPARO, esperaDisparo, CADENCIA_DISPARO);
+	}
 }
 
 void onKey(unsigned char tecla, int x, int y) {
@@ -659,6 +944,11 @@ void onKey(unsigned char tecla, int x, int y) {
 	case 'z':
 	case 'Z':
 		frenar();
+		break;
+
+	case 'k':
+	case 'K':
+		disparar();
 		break;
 
 	default:
@@ -680,6 +970,32 @@ void onKey(unsigned char tecla, int x, int y) {
 			glDisable(GL_LIGHT1);
 			glDisable(GL_LIGHT2);
 		}
+		break;
+	case 'c':
+	case 'C':
+		mostrarCabina = !mostrarCabina;
+		switch (camaraActual)
+		{
+		case basica:
+
+			//primeraPersona.setu(Vec3(1, 0, 0));  //x
+			//primeraPersona.setw(Vec3(0, -1, 0)); //y
+			//primeraPersona.setv(Vec3(0, 0, 1));  //z
+			primeraPersona.setu(player.getu());  //x
+			primeraPersona.setw(player.getw());  //y
+			primeraPersona.setv(player.getv());  //z
+			break;
+		case primera_persona:
+			break;
+		case tercera_persona:
+			break;
+		default:
+			break;
+		}
+		break;
+	case 'v':
+	case 'V':
+		camaraActual = tipoCamara((camaraActual+1)%2);
 		break;
 	case 27:
 		exit(0);
@@ -720,7 +1036,10 @@ void onDrag(int x, int y) {
 	girox += (y - yanterior) * pixel2grados;
 	cout << "x:" << girox << "\t y:" << giroy << "\n";
 	*/
+	//glutWarpPointer(windowWidth / 2, windowHeight / 2);
 
+	//xanterior = windowWidth / 2;
+	//yanterior = windowHeight / 2;
 	glutPostRedisplay();
 }
 
@@ -737,8 +1056,30 @@ void onPassiveMotiotion(int x, int y) {
 	float girox = (y - yanterior) * pixel2grados;
 	float giroy = (x - xanterior) * pixel2grados;
 
-	player.rotar(-girox*delta, player.getu());
-	player.rotar(-giroy*delta, player.getv());
+	switch (camaraActual)
+	{
+	case basica:
+		player.rotar(-girox * delta, player.getu());
+		player.rotar(-giroy * delta, player.getv());
+		primeraPersona = player;
+
+		cabinaPrimeraPersona.setu(Vec3(1, 0, 0));  //x
+		cabinaPrimeraPersona.setw(Vec3(0, -1, 0)); //y
+		cabinaPrimeraPersona.setv(Vec3(0, 0, 1));  //z
+	case primera_persona:
+		primeraPersona.rotar(-girox * delta, primeraPersona.getu());
+		primeraPersona.rotar(-giroy * delta, primeraPersona.getv());
+
+		cabinaPrimeraPersona.rotar(-girox * delta, cabinaPrimeraPersona.getu());
+		cabinaPrimeraPersona.rotar(-giroy * delta, cabinaPrimeraPersona.getv());
+
+		break;
+	case tercera_persona:
+		break;
+	default:
+		break;
+	} 
+	
 
 	//xanterior = x;
 	//yanterior = y;

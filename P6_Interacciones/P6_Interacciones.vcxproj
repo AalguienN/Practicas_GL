@@ -133,13 +133,15 @@
   <ItemGroup>
     <ClCompile Include="Asteroide.cpp" />
     <ClCompile Include="Blaster.cpp" />
-    <ClCompile Include="globales.cpp" />
+    <ClCompile Include="codebase2.cpp" />
+    <ClCompile Include="Explosion.cpp" />
     <ClCompile Include="Interaccion.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Asteroide.h" />
-    <ClInclude Include="Auxiliares.h" />
     <ClInclude Include="Blaster.h" />
+    <ClInclude Include="codebase2.h" />
+    <ClInclude Include="Explosion.h" />
     <ClInclude Include="globales.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

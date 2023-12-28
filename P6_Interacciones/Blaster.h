@@ -1,72 +1,48 @@
 #pragma once
-#include <codebase.h>
+#ifndef BLASTER_H
+#define BLASTER_H
+
+#include "codebase2.h"
 #include <iostream>
-#include "Auxiliares.h"
-#include "globales.h"
 
-using namespace cb;
+using namespace cb2;
 
-namespace blasterNS {
 
-	class Blaster {
-	private:
-		Vec3 position;
-		Vec3 direction;
-		float speed;
-		float lifeSpan;
-		bool vivo = false;
+class Blaster;
 
-		//Poner luces aquí en el futuro
+const int NUM_BLASTERS = 4;
 
-	public:
-		Blaster(
-			Vec3 position = Vec3(0, 0, 0),
-			Vec3 direction = Vec3(0, 1, 0),
-			float speed = 50,
-			float lifeSpan = 5
-		) : position(position), direction(direction.normalize()), speed(speed), vivo(false), lifeSpan(lifeSpan) {}
+class Blaster {
+private:
+	Vec3 position;
+	Vec3 direction;
+	float speed;
+	float lifeSpan;
+	bool vivo = false;
 
-		void Dibujar() {
-			if (vivo) {
-				glPushAttrib(GL_ALL_ATTRIB_BITS);
-				//glDisable(GL_LIGHTING);
-				glDisable(GL_LIGHTING);
-				glDisable(GL_TEXTURE_2D);
-				glColor3f(1.0f, 0.0f, 0.0f);
-				glPushMatrix();
-				glTranslatef(position.x, position.y, position.z);
-				glutSolidSphere(0.2, 8, 8);
-				glPopMatrix();
-				//glEnable(GL_LIGHTING);
-				glEnable(GL_TEXTURE_2D);
-				glEnable(GL_LIGHTING);
-				glPopAttrib();
-			}
-		}
+	//Poner luces aquí en el futuro
 
-		void Actualizar(float tiempo) {
-			if (vivo) {
-				position += direction * speed * tiempo;
-				lifeSpan -= tiempo;
-				if (lifeSpan < 0) {
-					Destruir();
-				}
-				speed = speed_Player + 50;
-			}
-		}
+public:
+	Blaster(
+		Vec3 position = Vec3(0, 0, 0),
+		Vec3 direction = Vec3(0, 1, 0),
+		float speed = 50,
+		float lifeSpan = 5
+	);
 
-		void Disparar() {
-			position = player.geto();
-			direction = player.getw() * -1;
-			lifeSpan = 5;
-			vivo = true;
-		}
+	void Dibujar();
 
-		void Destruir() { vivo = false; speed = 0; }
+	void Actualizar(float tiempo, float speed_player);
 
-		Vec3 GetPosition() { return position; }
+	void Disparar(Sistema3d player);
 
-		bool isAlive() { return vivo; }
-	};
-}
+	Blaster& Destruir();
+
+	Vec3 GetPosition();
+
+	bool isAlive();
+};
+
+#endif //BLASTER_H
+
 

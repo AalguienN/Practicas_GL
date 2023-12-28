@@ -2,22 +2,23 @@
 #ifndef GLOBALES_H
 #define GLOBALES_H
 
-#include "Blaster.h"
-#include <codebase.h>
 #include <iostream>
+#include "codebase2.h"
+#include "Blaster.h"
+#include "Asteroide.h"
+#include "Explosion.h"
 
-using namespace blasterNS;
-using namespace cb;
-
+using namespace cb2;
 
 extern Sistema3d player;
 
-extern float speed_Player;				//Velocidad de la nave
+extern Blaster blasters[NUM_BLASTERS];
 
-extern const int NUM_BLASTERS = 4;
-extern Blaster blasters[];
+extern int expActual;
+//extern Explosion explosiones[NUM_EXPLOSIONES];
 
-extern GLuint asteroide;
 
+
+//extern GLuint asteroide;
 
 #endif // !GLOBALES_H

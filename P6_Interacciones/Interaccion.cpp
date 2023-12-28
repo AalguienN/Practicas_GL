@@ -13,15 +13,16 @@
 
 #include <iostream>	
 #include <string>	
-#include <codebase.h>
+
+#include "codebase2.h"
+
 #include "Asteroide.h"
 #include "Blaster.h"
 #include "globales.h"
 
 using namespace std;
-using namespace cb;
-using namespace asteroideNS;
-using namespace blasterNS;
+using namespace cb2;
+//using namespace blasterNS;
 
 //Globales ---------------------------------------------------------------------------
 static int windowWidth;
@@ -38,9 +39,9 @@ static Sistema3d primeraPersona;
 static Sistema3d cabinaPrimeraPersona;
 
 //Nave / Player ----------------------------------------------------------------------
-//static Sistema3d player;
+Sistema3d player;
 static float z0 = 1;					//Altura inicial
-//static float speed_Player;				//Velocidad de la nave
+float speed_Player;				//Velocidad de la nave
 static const float ACCELERATION = 0.5;	//Aceleración de la nave
 static const float MAX_SPEED = 100;		//Velocidad máxima nave (delante y marcha atrás)
 float offset_girox = 0; float offset_giroy = 0;		//  
@@ -70,11 +71,11 @@ static const tipoAsteroide tipoA = senoidal;
 
 static Vec3 verticesAsteroide[(RES_ASTEROIDE+2) * (RES_ASTEROIDE+2)];
 
-
-
 static int blasterActual = 0;
 
-static Asteroide asteroides[NUM_ASTEROIDES];
+Asteroide asteroides[NUM_ASTEROIDES];
+Blaster blasters[NUM_BLASTERS];
+//Explosion explosiones[NUM_EXPLOSIONES];
 
 // Funcion de inicializacion propia
 void init()
@@ -454,7 +455,7 @@ void update() {
 	}
 
 	for (int i = 0; i < NUM_BLASTERS; i++) {
-		blasters[i].Actualizar(delta);
+		blasters[i].Actualizar(delta, speed_Player);
 	}
 
 	hora_anterior = hora_actual;
@@ -772,7 +773,7 @@ void display()
 
 
 	for (int i = 0; i < NUM_ASTEROIDES; i++) {
-		asteroides[i].Dibujar();
+		asteroides[i].Dibujar(asteroide);
 	}
 
 	for (int i = 0; i < NUM_BLASTERS; i++) {
@@ -928,7 +929,7 @@ void disparar() {
 	if (!disparando) {
 		disparando = true;
 		cout << "PUM!" << endl;
-		blasters[blasterActual].Disparar();
+		blasters[blasterActual].Disparar(player);
 		blasterActual = (blasterActual + 1) % NUM_BLASTERS;
 		//Llamar aquí al blaster
 		glutTimerFunc(CADENCIA_DISPARO, esperaDisparo, CADENCIA_DISPARO);

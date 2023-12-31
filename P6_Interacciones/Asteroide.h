@@ -26,13 +26,15 @@ class Asteroide {
 		Vec3 rotacion;
 		Vec3 velocidadAngular;
 		Vec3 deformaciones;
-		float size;
 		Vec3 rotAcionInterna;
 		//Radio de cada punto del asteroide respecto a su centro
 		//Resolución
 		float resolucion;
 
 	public:
+		float size;
+		bool explosion;
+		Vec3 posicionExplosion;
 		Asteroide(
 			Vec3 position = randomVec() * MAX_DIST_ASTEROIDES,
 			Vec3 velocidad = randomVec() * velIniAst,

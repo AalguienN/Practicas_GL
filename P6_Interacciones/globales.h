@@ -14,8 +14,8 @@ extern Sistema3d player;
 
 extern Blaster blasters[NUM_BLASTERS];
 
-extern int expActual;
-//extern Explosion explosiones[NUM_EXPLOSIONES];
+extern int explActual;
+extern const int NUM_EXPLOSIONES;
 
 
 

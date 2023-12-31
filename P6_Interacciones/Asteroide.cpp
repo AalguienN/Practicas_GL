@@ -15,9 +15,11 @@ Asteroide::Asteroide(
 	position(position), velocidad(velocidad),
 	rotacion(rotacion), velocidadAngular(velocidadAngular),
 	deformaciones(deformaciones),
-	size(size), 
+	size(size),
 	resolucion(res),
-	rotAcionInterna(rotacionInterna)
+	rotAcionInterna(rotacionInterna),
+	explosion(false),
+	posicionExplosion(Vec3(0,0,0))
 {
 	//cout << velocidadAngular.x << velocidadAngular.y << velocidadAngular.z << endl;
 };
@@ -56,9 +58,8 @@ void Asteroide::Actualizar(float tiempo) {
 	for (int i = 0; i < NUM_BLASTERS; i++) {
 		if (blasters[i].isAlive()) {
 			if ((blasters[i].GetPosition() - this->position).norm() < this->size) {
-				this->position = Vec3(random(-1, 1), random(-1, 1), random(-1, 1)).normalize() * MAX_DIST_ASTEROIDES * 0.99f + player.geto();
-				this->velocidad = Vec3(random(-velIniAst, velIniAst), random(-velIniAst, velIniAst), random(-velIniAst, velIniAst));
 				blasters[i].Destruir();
+				Explotar();
 			}
 		}
 	}
@@ -67,6 +68,11 @@ void Asteroide::Actualizar(float tiempo) {
 }
 
 void Asteroide::Explotar() {
+	cout << "Asteroide muelto" << endl;
+	explosion = true;
+	this->posicionExplosion = this->position;
+	this->position = Vec3(random(-1, 1), random(-1, 1), random(-1, 1)).normalize() * MAX_DIST_ASTEROIDES * 0.99f + player.geto();
+	this->velocidad = Vec3(random(-velIniAst, velIniAst), random(-velIniAst, velIniAst), random(-velIniAst, velIniAst));
 	//explosiones[expActual] = Explosion(position, 1, size / NUM_FRAGMENTOS, 0);
 }
 

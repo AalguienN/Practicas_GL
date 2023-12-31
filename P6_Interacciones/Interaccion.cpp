@@ -19,6 +19,7 @@
 #include "Asteroide.h"
 #include "Blaster.h"
 #include "globales.h"
+#include "Explosion.h"
 
 using namespace std;
 using namespace cb2;
@@ -38,6 +39,9 @@ const int VERTICES_POR_UNIDAD = 4;
 static Sistema3d primeraPersona;
 static Sistema3d cabinaPrimeraPersona;
 
+static Sistema3d terceraPersona3d;
+static Sistema3d terceraPersonaNave3d;
+
 //Nave / Player ----------------------------------------------------------------------
 Sistema3d player;
 static float z0 = 1;					//Altura inicial
@@ -49,18 +53,21 @@ float offset_girox = 0; float offset_giroy = 0;		//
 static bool mostrarCabina = true;
 static bool luces = true;
 
+static float girox, giroy;
+
 static int xanterior;
 static int yanterior;
 
 static bool disparando = false;
 static const float CADENCIA_DISPARO = 500;
 
-enum tipoCamara { basica = 0, primera_persona = 1, tercera_persona = 2};
+enum tipoCamara { basica = 0, primera_persona = 1, tercera_persona = 2, cinematica = 3};
 
 static tipoCamara camaraActual = basica;
 
 //Texturas ----------------------------------------------------------------------------
-static GLuint metal, roca, fondo, estrella, interiorNave, sofa;
+static GLuint metal, roca, fondo, estrella, interiorNave, exteriorNave, sofa,
+	suelo_techo_nave, Ventana_Nave_Exterior, lado_nave_1, lado_nave_2, reflejo_fondo;
 
 enum tipoAsteroide
 {
@@ -75,12 +82,16 @@ static int blasterActual = 0;
 
 Asteroide asteroides[NUM_ASTEROIDES];
 Blaster blasters[NUM_BLASTERS];
-//Explosion explosiones[NUM_EXPLOSIONES];
+Explosion explosiones[NUM_EXPLOSIONES];
+
+//void cubemap(GLfloat posicionEstrella[3], GLuint textura, bool dibujarEstrella);
 
 // Funcion de inicializacion propia
 void init()
 {
 	cout << glGetString(GL_VERSION) << endl;
+
+	srand(time(0)); //Inicialización de la semilla aleatoria
 	
 	#pragma region Luces
 
@@ -153,13 +164,49 @@ void init()
 	glBindTexture(GL_TEXTURE_2D, interiorNave);
 	loadImageFile((char*)"interior_panoramica.png");
 
+	glGenTextures(1, &exteriorNave);
+	glBindTexture(GL_TEXTURE_2D, exteriorNave);
+	loadImageFile((char*)"exterior_nave.png");
+
 	glGenTextures(1, &sofa);
 	glBindTexture(GL_TEXTURE_2D, sofa);
 	loadImageFile((char*)"sofa.jpg");
-	
 
+	glGenTextures(1, &suelo_techo_nave);
+	glBindTexture(GL_TEXTURE_2D, suelo_techo_nave);
+	loadImageFile((char*)"suelo_techo_nave.png");
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+	glGenTextures(1, &Ventana_Nave_Exterior);
+	glBindTexture(GL_TEXTURE_2D, Ventana_Nave_Exterior);
+	loadImageFile((char*)"Ventana_Nave_Exterior.png");
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+	glGenTextures(1, &lado_nave_1);
+	glBindTexture(GL_TEXTURE_2D, lado_nave_1);
+	loadImageFile((char*)"lado_nave_1.png");
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+	glGenTextures(1, &lado_nave_2);
+	glBindTexture(GL_TEXTURE_2D, lado_nave_2);
+	loadImageFile((char*)"lado_nave_2.png");
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+	glGenTextures(1, &reflejo_fondo);
+	glBindTexture(GL_TEXTURE_2D, reflejo_fondo);
+	loadImageFile((char*)"reflejo_fondo.jpg");
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	
 
 	#pragma endregion
 
@@ -402,14 +449,181 @@ void init()
 	glNewList(nave, GL_COMPILE);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	//glColor3f(1, 1, 1);
+	//ejes();
+	//glDisable(GL_CULL_FACE);
 
-	res = RES_ASTEROIDE;
+	int numVert = 50;
+	Vec3 propulsores[] = { Vec3(-.25f,-1.25f,-0.21f),Vec3(.25f,-1.25f,-0.21f),Vec3(0,-1.25f,0.21f), };
 
-	//glPolygonMode(GL_BACK, GL_LINE);
+	for (int i = 0; i < 3; i++) {
+		glPushMatrix();
+		glTranslatef(propulsores[i].x, propulsores[i].y, propulsores[i].z);
+		glScalef(0.25f, 0.25f, 0.25f);
+		glBegin(GL_TRIANGLE_STRIP);
+		//Parte delantera
+		for (int i = 0; i <= numVert; i++) {
+			Vec3 v(-cos(i * 2 * PI / numVert), 1, sin(i * 2 * PI / numVert));
+			Vec3 n = v;
+			n.normalize();
+			glNormal3f(n.x, n.y, n.z);
+			glVertex3f(0, 2, 0);
+			glVertex3f(v.x, v.y, v.z);
+		}
+		//Parte trasera
+		for (int i = 0; i <= numVert; i++) {
+			Vec3 v(-cos(i * 2 * PI / numVert), 1, sin(i * 2 * PI / numVert));
+			Vec3 n = v;
+			n.normalize();
+			glNormal3f(n.x, n.y, n.z);
+			glVertex3f(v.x, v.y, v.z);
+			glVertex3f(0, 2, 0);
+		}
+		glEnd();
+		glPopMatrix();
+	}
+	//----------------------------------------------------------------------------------------------------
 
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glBindTexture(GL_TEXTURE_2D, reflejo_fondo);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+	glEnable(GL_TEXTURE_GEN_S);
+	glEnable(GL_TEXTURE_GEN_T);
+	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP);
+	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP);
+	glDisable(GL_LIGHTING);
+	GLfloat Dm_TV[] = { 0.8,0.8,0.8,1.0 };
+	GLfloat Sm_TV[] = { 0.8,0.8,0.8,1.0 };
+	GLfloat s_TV = 20.0;
+	glColor3f(0.4f, 0.4f, 0.4f);
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, Dm_TV);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, Sm_TV);
+	glMaterialf(GL_FRONT, GL_SHININESS, s_TV);
+	glPushMatrix();
+	glScalef(0.99, 0.99, 0.99);
+	glPushMatrix();
+	//Arriba y abajo
+	for (int i = 0; i < 2; i++) {
+		GLfloat v0[3] = { .5f,.8f + 0.4 * i,0 };
+		GLfloat v1[3] = { -.5f,.8f + 0.4 * i,0 };
+		GLfloat v2[3] = { -.5f,-.8f,0 };
+		GLfloat v3[3] = { .5f,-.8f,0 };
+		glPushMatrix();
+		glRotatef(180 * i, 0, 1, 0);
+		glTranslatef(0, 0, .5f);
+		quadtex(v0, v1, v2, v3, 0, 1, 0, 1, 20, 20);
+		glPopMatrix();
+	}
+	//Derecha e izquierda
+	for (int i = 0; i < 2; i++) {
+		//Techo/suelo
+		GLfloat v0[3] = { .5f,.8f + 0.4 * abs((i - 1) % 2),0 };
+		GLfloat v1[3] = { -.5f,.8f + 0.4 * i,0 };
+		GLfloat v2[3] = { -.5f,-.8f,0 };
+		GLfloat v3[3] = { .5f,-.8f,0 };
 
+		glPushMatrix();
+		glRotatef(180 * i + 90, 0, 1, 0);
+		glTranslatef(0, 0, .5f);
+		quadtex(v0, v1, v2, v3, 0, 1, 0, 1, 20, 20);
+		glPopMatrix();
+	}
+
+	//Delante y detrás
+	for (int i = 1; i >= 0; i--) {
+		//Pared
+		GLfloat v0[3] = { .5f, 0.5f,+0.4f * i };
+		GLfloat v1[3] = { -.5f,.5f,+0.4f * i };
+		GLfloat v2[3] = { -.5f,-.5f, 0 };
+		GLfloat v3[3] = { .5f,-.5f, 0 };
+
+		glPushMatrix();
+		glRotatef(180 * i + 90, 1, 0, 0);
+		glTranslatef(0, 0, .8f);
+		quadtex(v0, v1, v2, v3, 0, 1, 0, 1, 20, 20);
+		glPopMatrix();
+	}
+	glPopMatrix();
+	glPopMatrix(),
+	glPopAttrib();
+	//-----------------------------------------------------------------------------------
+
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, GRISCLARO);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, GRISCLARO);
+	glMaterialf(GL_FRONT, GL_SHININESS, 100);
+
+	glPushMatrix();
+	glBindTexture(GL_TEXTURE_2D, suelo_techo_nave);
+	//Arriba y abajo
+	for (int i = 0; i < 2; i++) {
+		GLfloat v0[3] = {.5f,.8f+0.4*i,0};
+		GLfloat v1[3] = {-.5f,.8f+0.4*i,0};
+		GLfloat v2[3] = {-.5f,-.8f,0};
+		GLfloat v3[3] = {.5f,-.8f,0};
+		glPushMatrix();
+		glRotatef(180 * i, 0, 1, 0);
+		glTranslatef(0, 0, .5f);
+		quadtex(v0,v1,v2,v3,0,1,0,1,20,20);	
+		glPopMatrix();
+	}
+	//Derecha e izquierda
+	glBindTexture(GL_TEXTURE_2D, lado_nave_1);
+	for (int i = 0; i < 2; i++) {
+		//Techo/suelo
+		GLfloat v0[3] = { .5f,.8f+0.4 * abs((i - 1) % 2),0 };
+		GLfloat v1[3] = { -.5f,.8f+0.4 * i,0};
+		GLfloat v2[3] = { -.5f,-.8f,0 };
+		GLfloat v3[3] = { .5f,-.8f,0 };
+
+		glPushMatrix();
+		glRotatef(180 * i + 90, 0, 1, 0);
+		glTranslatef(0, 0, .5f);
+		quadtex(v0, v1, v2, v3, 0, 1, 0, 1, 20, 20);
+		glPopMatrix();
+	}
+	glDisable(GL_LIGHT1);
+	glDisable(GL_LIGHT2);
+	//Delante y detrás
+	glBindTexture(GL_TEXTURE_2D, Ventana_Nave_Exterior);
+	for (int i = 1; i >= 0; i--) {
+		//Pared
+		GLfloat v0[3] = { .5f, 0.5f,+0.4f * i};
+		GLfloat v1[3] = { -.5f,.5f,+0.4f * i};
+		GLfloat v2[3] = { -.5f,-.5f, 0};
+		GLfloat v3[3] = { .5f,-.5f, 0};
+
+		glPushMatrix();
+		glRotatef(180 * i + 90, 1, 0, 0);
+		glTranslatef(0, 0, .8f);
+		quadtex(v0, v1, v2, v3, 0, 1, 0, 1, 20, 20);
+		glPopMatrix();
+		glBindTexture(GL_TEXTURE_2D, suelo_techo_nave);
+	}
+	glEnable(GL_LIGHT1);
+	glEnable(GL_LIGHT2);
+
+	//Alas
+	glBindTexture(GL_TEXTURE_2D, suelo_techo_nave);
+	glPushMatrix();
+	glTranslatef(0, -0.5f, -0.4f);
+	GLfloat v0A[3] = { -1,1,0 };
+	GLfloat v1A[3] = { 1,1,0 };
+	GLfloat v2A[3] = { 1.5f,0,0 };
+	GLfloat v3A[3] = { -1.5f,0,0 };
+	GLfloat v4A[3] = { -1.3,0,.25f };
+	GLfloat v5A[3] = { 1.3,0,.25f };
+	quadtex(v5A, v4A, v3A, v2A, 0, 1, 0, 1, 20, 20);
+	quadtex(v1A, v0A, v4A, v5A, 0, 1, 0, 1, 20, 20);
+	quadtex(v0A, v1A, v2A, v3A, 0, 1, 0, 1, 20, 20);
+
+	quadtex(v0A, v3A, v3A, v4A, 0, 1, 0, 1, 20, 20);
+	quadtex(v1A, v5A, v5A, v2A, 0, 1, 0, 1, 20, 20);
+	glEnd();
+	glPopMatrix();
+
+	glPopMatrix();
 	
-
+	//glPolygonMode(GL_BACK, GL_LINE);
 
 	glPopAttrib();
 	glEndList();
@@ -430,6 +644,7 @@ void init()
 
 //Diferencia entre 2 álgulos
 // https://stackoverflow.com/questions/21622956/how-to-convert-direction-vector-to-euler-angles
+// https://stackoverflow.com/questions/21622956/how-to-convert-direction-vector-to-euler-angles
 void lcs2Euler(){
 
 
@@ -445,6 +660,10 @@ void update() {
 
 	Vec3 w = player.getw();
 
+	//Reducimos el giro progresivamente para que parezca más suave
+	girox = girox * 0.8f * delta * 50;
+	giroy = giroy * 0.8f * delta * 50;
+
 	//Al final funciona con el sistema de referencia
 	//posPlayer += Vec3(-w.x * speed_Player * delta, -w.y * speed_Player * delta, -w.z * speed_Player * delta);
 
@@ -452,10 +671,23 @@ void update() {
 
 	for (int i = 0; i < NUM_ASTEROIDES; i++) {
 		asteroides[i].Actualizar(delta);
+		if (asteroides[i].explosion == true) { 
+			cout << "Explosion solicitada, id:" << i << endl
+				<< "Posicion" << asteroides[i].posicionExplosion.x << ','
+				<< asteroides[i].posicionExplosion.y << ','
+				<< asteroides[i].posicionExplosion.z;
+
+			explosiones[explActual].Iniciar(asteroides[i].posicionExplosion, asteroides[i].size);
+			explActual = (explActual + 1) % NUM_EXPLOSIONES;
+			asteroides[i].explosion = false; }
 	}
 
 	for (int i = 0; i < NUM_BLASTERS; i++) {
 		blasters[i].Actualizar(delta, speed_Player);
+	}
+
+	for (int i = 0; i < NUM_EXPLOSIONES; i++) {
+		explosiones[i].Actualizar(delta);
 	}
 
 	hora_anterior = hora_actual;
@@ -476,13 +708,12 @@ void cubemap(GLfloat posicionEstrella[3], GLuint textura, bool dibujarEstrella) 
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glMaterialf(GL_FRONT, GL_SHININESS, 0);
 
-
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 	glEnable(GL_TEXTURE_GEN_S);
 	glEnable(GL_TEXTURE_GEN_T);
-	static float planoS[] = { 1,0,0,0 };
-	static float planoT[] = { 0,0,1,0 };
+	static float planoS[] = { 10,0,0,0 };
+	static float planoT[] = { 0,10,0,0 };
 	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
 	glTexGenfv(GL_S, GL_OBJECT_PLANE, planoS);
 	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
@@ -554,11 +785,12 @@ void cubemap(GLfloat posicionEstrella[3], GLuint textura, bool dibujarEstrella) 
 	glEnable(GL_LIGHTING);
 	glPopMatrix();
 }
-void cabina(GLuint textura) {
-	if (mostrarCabina) {
+
+void terceraPersona() {
+	if (camaraActual == tercera_persona) {
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		glDisable(GL_LIGHTING);
-		glEnable(GL_DEPTH_TEST);	//Profundidad
+		//glDisable(GL_LIGHTING);
+		//glDisable(GL_DEPTH_TEST);	//Profundidad
 
 		glPushMatrix();
 		glLoadIdentity();
@@ -566,7 +798,64 @@ void cabina(GLuint textura) {
 		glPushMatrix();
 		glLoadIdentity();
 		//glOrtho(-1, 1, -1, 1, -1, 1);
-		gluPerspective(90, 1, 0.1, 2);
+		gluPerspective(90, windowWidth / float(windowHeight), 0.1, 10);
+		glMatrixMode(GL_MODELVIEW);
+
+		Vec3 lookAt;
+		Vec3 up;
+		up = Vec3(0, 0, 1);
+
+		if (camaraActual == basica) {
+			lookAt = Vec3(0, 1, 0);
+			//up = Vec3(0, 0, 1);
+		}
+
+		//lookAt = player.getw() * -1;
+		else if (camaraActual == tercera_persona) {
+			lookAt = terceraPersonaNave3d.getw() * 2;
+		}
+
+		//gluLookAt(0, 0, 0, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z);
+		gluLookAt(0, -5, 0, 0, 0, 0, up.x, up.y, up.z);
+
+		//glBindTexture(GL_TEXTURE_2D, textura);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		//glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+		glPushMatrix();
+		glTranslatef(0, -2, 0);
+		glRotatef(girox * 2 * PI, 1, 0, 0);
+		glRotatef(giroy * 2 * PI, 0, 0, 1);
+		glCallList(nave);
+		glPopMatrix();
+		
+		if (camaraActual == primera_persona) {
+			glRotatef(offset_girox * 360 / 2 / PI, 1, 0, 0);
+			glRotatef(offset_giroy * 360 / 2 / PI, 0, 1, 0);
+		}
+
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPopMatrix();
+		glPopAttrib();
+	}
+}
+
+void cabina(GLuint textura) {
+	if (mostrarCabina && camaraActual != tercera_persona) {
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glDisable(GL_LIGHTING);
+		glDisable(GL_DEPTH_TEST);	//Profundidad
+
+		glPushMatrix();
+		glLoadIdentity();
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glLoadIdentity();
+		//glOrtho(-1, 1, -1, 1, -1, 1);
+		gluPerspective(90, windowWidth/float(windowHeight), 0.1, 2);
 		glMatrixMode(GL_MODELVIEW);
 
 		Vec3 lookAt;
@@ -586,18 +875,27 @@ void cabina(GLuint textura) {
 
 		gluLookAt(0, 0, 0, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z);
 
+		//glBindTexture(GL_TEXTURE_2D, textura);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		//glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 
-		glBindTexture(GL_TEXTURE_2D, textura);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+		glPushMatrix();
+		glRotatef(-90, 1, 0, 0);
+		glRotatef(180, 0, 1, 0);
+		glRotatef(90, 0, 0, 1);		
+		glRotatef(girox/2.f, 0, 1, 0);
+		glRotatef(giroy/2.f, 1, 0, 0);
+		cubemap(Vec3(0, 0, 0), textura, false);
+		glPopMatrix();
 
 		if (camaraActual == primera_persona) {
 			glRotatef(offset_girox * 360 / 2 / PI, 1, 0, 0);
 			glRotatef(offset_giroy * 360 / 2 / PI, 0, 1, 0);
 		}
 
-
+		glEnable(GL_DEPTH_TEST);
+		glDisable(GL_LIGHTING);
 		glBindTexture(GL_TEXTURE_2D, sofa);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -642,10 +940,6 @@ void cabina(GLuint textura) {
 		glDisable(GL_TEXTURE_GEN_T);
 
 
-		glRotatef(-90, 1, 0, 0);
-		glRotatef(180, 0, 1, 0);
-		glRotatef(90, 0, 0, 1);
-		cubemap(Vec3(0, 0, 0), textura, false);
 
 		glMatrixMode(GL_PROJECTION);
 		glPopMatrix();
@@ -677,9 +971,11 @@ void display()
 
 	Vec3 lookAt = origen - player.getw();;
 	Vec3 up;
-	/*
-	
-	*/
+	Vec3 offset3p(0,0,0);
+
+	Vec3 faro1 = player.getu() * 0.25f;
+	Vec3 faro2 = player.getu() * -0.25f;
+
 	if (camaraActual == basica) {
 		lookAt = origen - player.getw(); //w
 		up = player.getv();
@@ -691,22 +987,55 @@ void display()
 		up = primeraPersona.getv();
 	}
 	
+	else if (camaraActual == tercera_persona) {
+		lookAt = origen - player.getw();
+		up = terceraPersona3d.getv();
+		offset3p = player.getw()*8;
+		faro1 += offset3p * 8;
+		faro2 += offset3p * 8;
+	}
 
-	Vec3 faro1 =  player.getu()*0.25f;
-	Vec3 faro2 =  player.getu()*-0.25f;
+	else if (camaraActual == cinematica) {
+		lookAt = origen - player.getw();
+		up = Vec3(0,0,1);
+		//offset3p = player.getw() * 8;
+		faro1 += offset3p * 8;
+		faro2 += offset3p * 8;
+	}
 
 	static GLfloat posFaro1[] = { faro1.x, faro1.y, faro1.z, 1 }; //PosSpot
 	glLightfv(GL_LIGHT1, GL_POSITION, posFaro1);
 	GLfloat dir_central1[] = { 0.1f, 0, -1.0f };
 	glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, dir_central1);
 
+	//cout << faro1.x << faro1.y << faro1.z << endl;
+
 	static GLfloat posFaro2[] = { faro2.x, faro2.y, faro2.z, 1 }; //PosSpot
 	glLightfv(GL_LIGHT2, GL_POSITION, posFaro2);
 	GLfloat dir_central2[] = { -0.1f, 0, -1.0f };
 	glLightfv(GL_LIGHT2, GL_SPOT_DIRECTION, dir_central2);
 	#pragma endregion
-
-	gluLookAt(origen.x, origen.y, origen.z, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z); //Desde el frente
+	if (camaraActual != tercera_persona && camaraActual != cinematica)
+		gluLookAt(origen.x + offset3p.x, origen.y + offset3p.y, origen.z + offset3p.z, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z); //Desde el frente
+	else if (camaraActual == tercera_persona)
+		gluLookAt(origen.x + offset3p.x, origen.y + offset3p.y, origen.z + offset3p.z, origen.x, origen.y, origen.z, up.x, up.y, up.z); //Desde el frente
+	else if (camaraActual == cinematica) {
+		float distAsteroideCamara = INFINITY;
+		int i = 0; float cont = 0; int ite = 0;
+		if (distAsteroideCamara > MAX_DIST_ASTEROIDES) {
+			while (distAsteroideCamara > cont) {
+				distAsteroideCamara = (asteroides[i].getPos() - player.geto()).norm();
+				i = (i + 1) % NUM_ASTEROIDES; 
+				cont += 0.2f; ite++;
+			}
+			i = (i-1)%NUM_ASTEROIDES;
+			cout << i << "   " << cont << "   " << distAsteroideCamara << "          ";
+		}
+		Vec3 pos = asteroides[i].getPos();
+		cout << "a";
+		gluLookAt(pos.x, pos.y, pos.z, origen.x, origen.y, origen.z, up.x, up.y, up.z); //Desde el frente
+	}
+	
 	//gluLookAt(5, -5, 5, origen.x, origen.y, origen.z, up.x, up.y, up.z); //Desde el frente
 
 	//ejes();
@@ -733,6 +1062,7 @@ void display()
 	glMaterialf(GL_FRONT, GL_SHININESS, 0);
 
 	glCallList(suelo);
+
 	/*
 	//Esfera
 	glMaterialfv(GL_FRONT, GL_DIFFUSE, AZUL);
@@ -772,12 +1102,27 @@ void display()
 	//glPopMatrix();
 
 
+
+#pragma region cubemap
+	glPushMatrix();
+	glTranslatef(origen.x, origen.y, origen.z);
+	glScalef(9000, 9000, 9000);
+	cubemap(posicionEstrella, fondo, true);
+	glPopMatrix();
+
+#pragma endregion
+
+
 	for (int i = 0; i < NUM_ASTEROIDES; i++) {
 		asteroides[i].Dibujar(asteroide);
 	}
 
 	for (int i = 0; i < NUM_BLASTERS; i++) {
 		blasters[i].Dibujar();
+	}
+
+	for (int i = 0; i < NUM_EXPLOSIONES; i++) {
+		explosiones[i].Dibujar();
 	}
 	
 	//Luz de los blasters
@@ -815,69 +1160,77 @@ void display()
 	else { glDisable(GL_LIGHT6); }
 	*/
 	
-
-	#pragma region cubemap
-	glPushMatrix();
-	glTranslatef(origen.x, origen.y, origen.z);
-	glScalef(9000, 9000, 9000);
-	cubemap(posicionEstrella, fondo, true);
-	glPopMatrix();
-	
-	#pragma endregion
-	/*
-		glPushMatrix();
-	glPushMatrix();
-	glPopMatrix();
-	glTranslatef(lookAt.x,lookAt.y,lookAt.z);
-	player.drawLocal();
-	//player.drawGlobal();
-	//ejes();
-	glPopMatrix();
-
-	glEnable(GL_LIGHTING);
-
-	// PROBLEMAS! EN OBRAS!
-	//glBindTexture(GL_TEXTURE_2D, interiorNave);
-	glPushMatrix();
-	Vec3 vecDir = player.getw() * -1;
-	Vec3 vecUp = player.getv();
-	
-	// https://stackoverflow.com/questions/42554960/get-xyz-angles-between-vectors
-	float angulo = acos(Vec3(0, 1, 0).dot(vecDir));
-	Vec3 axis = Vec3(0, 1, 0).cross(vecDir);
-
-	Vec3 transFV(0,0,1);
-	transFV = transFV.rotate(angulo, axis);
-
-	float anguloUP = transFV.dot(vecUp);
-	cout << anguloUP * 360 / 2 / PI << endl;
-
-	glPushMatrix();
-	glTranslatef(lookAt.x, lookAt.y, lookAt.z);
-	glRotatef(angulo * 360 / 2 / PI, axis.x, axis.y, axis.z);
-
-	glutSolidCube(0.1f);
-	ejes();
-	glPopMatrix();
-
-	//cout << c << "|" << s << "|" << t << endl;
-
-	//cout << angulo << endl;
-	Vec3 rotV(0, 0, 0);
-	//rotV = vectorDirecionAAngulo(player.getw() * -1, player.getv());
-	//cout << rotV.x * 360 / (2 * PI) << "|" << rotV.y * 360 / (2 * PI) << "|" << rotV.z * 360 / (2 * PI) << endl;
-	glTranslatef(origen.x, origen.y, origen.z);
-	glRotatef(rotV.x * 360 / (2*PI), 1, 0, 0);
-	glRotatef(rotV.y * 360 / (2 * PI), 0, 1, 0);
-	glRotatef(rotV.z * 360 / (2 * PI), 0, 0, 1);
-	//cubemap(Vec3(0, 0, 0), interiorNave, false);
-	glPopMatrix();
-	*/
-
-
+	//glPushMatrix();
+	//glTranslatef(lookAt.x, lookAt.y, lookAt.z);
+	//glScalef(0.2, 0.2, 0.2);
+	//glCallList(nave);
+	//glPopMatrix();
 
 	cabina(interiorNave);
-	
+
+	//Joystick
+	if (mostrarCabina) {
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glPushMatrix();
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_LIGHTING);
+		glDisable(GL_TEXTURE_2D);
+		glColor3f(1, 0, 0);
+		Vec3 punteroDireccion = player.getw() * -1;
+		float rotx = girox, roty = giroy;
+		if (abs(girox) > 1) rotx = 1 * signo(girox);
+		if (abs(giroy) > 1) roty = 1 * signo(giroy);
+		punteroDireccion.rotate(-rotx * 0.1f, player.getu());
+		punteroDireccion.rotate(-roty * 0.1f, player.getv());
+		punteroDireccion += origen;
+		glTranslatef(punteroDireccion.x, punteroDireccion.y, punteroDireccion.z);
+		glTranslatef(player.getv().x * -0.5f, player.getv().y * -0.5f, player.getv().z * -0.5f);
+		glutSolidSphere(0.05, 10, 10);
+		glPopMatrix();
+		glPopAttrib();
+	}
+	terceraPersona();
+
+	if (camaraActual == cinematica) {
+		#pragma region AAAAAAAAAAAAAA
+		glPushMatrix();
+		glPushMatrix();
+		glPopMatrix();
+		glTranslatef(lookAt.x, lookAt.y, lookAt.z);
+		//player.drawLocal();
+		//player.drawGlobal();
+		//ejes();
+		glPopMatrix();
+
+		glEnable(GL_LIGHTING);
+
+		// PROBLEMAS! EN OBRAS!
+		//glBindTexture(GL_TEXTURE_2D, interiorNave);
+		glPushMatrix();
+		Vec3 vecDir = player.getw() * -1;
+		Vec3 vecUp = player.getv();
+
+		// https://stackoverflow.com/questions/42554960/get-xyz-angles-between-vectors
+		float angulo = acos(Vec3(0, 1, 0).dot(vecDir));
+		Vec3 axis = Vec3(0, 1, 0).cross(vecDir);
+
+		Vec3 transFV(0, 0, 1);
+		transFV = transFV.rotate(angulo, axis);
+
+		float anguloUP = transFV.dot(vecUp);
+		if (isnan(anguloUP)) { cout << "check"; }
+		cout << anguloUP * 360 / 2 / PI << endl;
+
+		glPushMatrix();
+		glTranslatef(origen.x, origen.y, origen.z);
+		glRotatef(angulo * 360 / 2 / PI, axis.x, axis.y, axis.z);
+
+		glPushMatrix();
+		glCallList(nave);
+		glPopMatrix();
+		glPopMatrix();
+		#pragma endregion
+	}
 
 	/*
 	glPushMatrix();
@@ -893,7 +1246,6 @@ void display()
 // Funcion de atencion al redimensionamiento
 void reshape(GLint w, GLint h)
 {
-
 	//Relación de aspecto
 	float ra = (float)w / (float)h;
 
@@ -978,7 +1330,10 @@ void onKey(unsigned char tecla, int x, int y) {
 		switch (camaraActual)
 		{
 		case basica:
-
+			if (luces) {
+				glEnable(GL_LIGHT1);
+				glEnable(GL_LIGHT2);
+			}
 			//primeraPersona.setu(Vec3(1, 0, 0));  //x
 			//primeraPersona.setw(Vec3(0, -1, 0)); //y
 			//primeraPersona.setv(Vec3(0, 0, 1));  //z
@@ -987,8 +1342,21 @@ void onKey(unsigned char tecla, int x, int y) {
 			primeraPersona.setv(player.getv());  //z
 			break;
 		case primera_persona:
+			if (luces) {
+				glEnable(GL_LIGHT1);
+				glEnable(GL_LIGHT2);
+			}
 			break;
 		case tercera_persona:
+			glDisable(GL_LIGHT1);
+			glDisable(GL_LIGHT2);
+			luces = false;
+			break;
+		case cinematica:
+			glDisable(GL_LIGHT1);
+			glDisable(GL_LIGHT2);
+			luces = false;
+
 			break;
 		default:
 			break;
@@ -996,7 +1364,7 @@ void onKey(unsigned char tecla, int x, int y) {
 		break;
 	case 'v':
 	case 'V':
-		camaraActual = tipoCamara((camaraActual+1)%2);
+		camaraActual = tipoCamara((camaraActual+1)%4);
 		break;
 	case 27:
 		exit(0);
@@ -1046,7 +1414,7 @@ void onDrag(int x, int y) {
 
 
 void onPassiveMotiotion(int x, int y) {
-	static float pixel2grados = 0.01f;
+	static float pixel2grados = 0.005f;
 	//glutWarpPointer(windowWidth / 2, windowHeight / 2);
 
 	//Giramos siendo coherentes con el tiempo
@@ -1054,8 +1422,8 @@ void onPassiveMotiotion(int x, int y) {
 	int hora_actual = glutGet(GLUT_ELAPSED_TIME);
 	float delta = (hora_actual - hora_anterior)/100.0f;
 
-	float girox = (y - yanterior) * pixel2grados;
-	float giroy = (x - xanterior) * pixel2grados;
+	girox += (y - yanterior) * pixel2grados;
+	giroy += (x - xanterior) * pixel2grados;
 
 	switch (camaraActual)
 	{
@@ -1063,6 +1431,7 @@ void onPassiveMotiotion(int x, int y) {
 		player.rotar(-girox * delta, player.getu());
 		player.rotar(-giroy * delta, player.getv());
 		primeraPersona = player;
+		terceraPersona3d = player;
 
 		cabinaPrimeraPersona.setu(Vec3(1, 0, 0));  //x
 		cabinaPrimeraPersona.setw(Vec3(0, -1, 0)); //y
@@ -1076,6 +1445,15 @@ void onPassiveMotiotion(int x, int y) {
 
 		break;
 	case tercera_persona:
+		player.rotar(-girox * delta, player.getu());
+		player.rotar(-giroy * delta, player.getv());
+
+		terceraPersona3d.rotar(-girox * delta, terceraPersona3d.getu());
+		terceraPersona3d.rotar(-giroy * delta, terceraPersona3d.getv());
+
+		//terceraPersonaNave3d.rotar(-girox * delta, terceraPersona3d.getu());
+		//terceraPersonaNave3d.rotar(-giroy * delta, terceraPersona3d.getv());
+
 		break;
 	default:
 		break;
@@ -1087,6 +1465,8 @@ void onPassiveMotiotion(int x, int y) {
 
 	//Fija el cursor en la posición central de la pantalla
 	glutWarpPointer(windowWidth / 2, windowHeight / 2);
+	glutSetCursor(GLUT_CURSOR_NONE);
+
 
 	xanterior = windowWidth / 2;
 	yanterior = windowHeight / 2;

@@ -32,7 +32,7 @@ public:
 
 	void Actualizar(float tiempo);
 
-	void Dibujar();
+	void Dibujar(GLuint text);
 
 	void Destruir();
 };

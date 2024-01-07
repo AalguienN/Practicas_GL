@@ -36,8 +36,8 @@ void Blaster::Actualizar(float tiempo, float speed_Player) {
 	}
 }
 
-void Blaster::Disparar(Sistema3d player) {
-	position = player.geto();
+void Blaster::Disparar(Sistema3d player, Vec3 offset) {
+	position = player.local2global(offset);
 	direction = player.getw() * -1;
 	lifeSpan = 5;
 	vivo = true;

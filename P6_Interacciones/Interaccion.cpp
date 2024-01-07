@@ -65,6 +65,10 @@ enum tipoCamara { basica = 0, primera_persona = 1, tercera_persona = 2, cinemati
 
 static tipoCamara camaraActual = basica;
 
+//Para la cámara cinematica
+float distAsteroideCamara = INFINITY;
+int camAstActual = 0;
+
 //Texturas ----------------------------------------------------------------------------
 static GLuint metal, roca, fondo, estrella, interiorNave, exteriorNave, sofa,
 	suelo_techo_nave, Ventana_Nave_Exterior, lado_nave_1, lado_nave_2, reflejo_fondo;
@@ -660,9 +664,48 @@ void update() {
 
 	Vec3 w = player.getw();
 
+	cout << girox << ",\t" << giroy << ",\t" << delta << endl;
+
+	//Giro
+	switch (camaraActual)
+	{
+	case basica:
+		player.rotar(-girox * delta, player.getu());
+		player.rotar(-giroy * delta, player.getv());
+		primeraPersona = player;
+		terceraPersona3d = player;
+
+		cabinaPrimeraPersona.setu(Vec3(1, 0, 0));  //x
+		cabinaPrimeraPersona.setw(Vec3(0, -1, 0)); //y
+		cabinaPrimeraPersona.setv(Vec3(0, 0, 1));  //z
+	case primera_persona:
+		primeraPersona.rotar(-girox * delta, primeraPersona.getu());
+		primeraPersona.rotar(-giroy * delta, primeraPersona.getv());
+
+		cabinaPrimeraPersona.rotar(-girox * delta, cabinaPrimeraPersona.getu());
+		cabinaPrimeraPersona.rotar(-giroy * delta, cabinaPrimeraPersona.getv());
+
+		break;
+	case tercera_persona:
+		player.rotar(-girox * delta, player.getu());
+		player.rotar(-giroy * delta, player.getv());
+
+		terceraPersona3d.rotar(-girox * delta, terceraPersona3d.getu());
+		terceraPersona3d.rotar(-giroy * delta, terceraPersona3d.getv());
+
+		//terceraPersonaNave3d.rotar(-girox * delta, terceraPersona3d.getu());
+		//terceraPersonaNave3d.rotar(-giroy * delta, terceraPersona3d.getv());
+
+		break;
+	default:
+		break;
+	}
+
 	//Reducimos el giro progresivamente para que parezca más suave
-	girox = girox * 0.8f * delta * 50;
-	giroy = giroy * 0.8f * delta * 50;
+	if (abs(girox) > 0.1f) { girox -= signo(girox) * delta * abs(girox) * 10; }
+	else girox = 0;
+	if (abs(giroy) > 0.1f) { giroy -= signo(giroy) * delta * abs(giroy) * 10; }
+	else giroy = 0;
 
 	//Al final funciona con el sistema de referencia
 	//posPlayer += Vec3(-w.x * speed_Player * delta, -w.y * speed_Player * delta, -w.z * speed_Player * delta);
@@ -730,8 +773,6 @@ void cubemap(GLfloat posicionEstrella[3], GLuint textura, bool dibujarEstrella) 
 	glDisable(GL_TEXTURE_GEN_S);
 	glDisable(GL_TEXTURE_GEN_T);
 	glPopMatrix();
-	
-
 
 	glBindTexture(GL_TEXTURE_2D, textura);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -782,6 +823,7 @@ void cubemap(GLfloat posicionEstrella[3], GLuint textura, bool dibujarEstrella) 
 		glEnd();
 		glPopMatrix();
 	}
+
 	glEnable(GL_LIGHTING);
 	glPopMatrix();
 }
@@ -860,17 +902,16 @@ void cabina(GLuint textura) {
 
 		Vec3 lookAt;
 		Vec3 up;
-		up = Vec3(0, 0, 1);
 
 		if (camaraActual == basica) {
 			lookAt = Vec3(0, 1, 0);
-			//up = Vec3(0, 0, 1);
+			up = Vec3(0, 0, 1);
 		}
 
 		//lookAt = player.getw() * -1;
 		else if (camaraActual == primera_persona) {
 			lookAt = cabinaPrimeraPersona.getw() * -1;
-			//up = cabinaPrimeraPersona.getv();
+			up = cabinaPrimeraPersona.getv();
 		}
 
 		gluLookAt(0, 0, 0, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z);
@@ -879,14 +920,122 @@ void cabina(GLuint textura) {
 		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		//glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+		Vec3 punteroDireccion = Vec3(0, 0, -1);
+		float rotx = girox, roty = giroy;
+		if (abs(girox) > 1) rotx = 1 * signo(girox);
+		if (abs(giroy) > 1) roty = 1 * signo(giroy);
+		if (camaraActual == basica) {
+			punteroDireccion.rotate(rotx * 0.1f, cabinaPrimeraPersona.getw());
+			punteroDireccion.rotate(roty * 0.1f, cabinaPrimeraPersona.getu());
+		}
 
 		glPushMatrix();
 		glRotatef(-90, 1, 0, 0);
 		glRotatef(180, 0, 1, 0);
 		glRotatef(90, 0, 0, 1);		
-		glRotatef(girox/2.f, 0, 1, 0);
-		glRotatef(giroy/2.f, 1, 0, 0);
+		glPushMatrix();
+		glRotatef(girox / 2.f, 0, 1, 0);
+		glRotatef(giroy / 2.f, 1, 0, 0);
 		cubemap(Vec3(0, 0, 0), textura, false);
+		
+		//-----------------------------
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_LIGHTING);
+		glDisable(GL_TEXTURE_2D);
+		glDisable(GL_CULL_FACE);
+
+		//--------------------- RETICULA ----------------------------------------------------
+
+		glPushMatrix();
+		glTranslatef(0, 0, -1);
+		glRotatef(90, 1, 0, 0);
+		glRotatef(-180, 0, 1, 0);
+		glRotatef(-90, 0, 0, 1);
+		glColor4f(1, 1, 1, 1);
+		glRotatef(90, 0, 1, 0);
+		glutSolidTorus(0.0025f, 0.03f, 20, 20);
+		glPopMatrix();
+
+		//--------------------- INDICADORES DE LA NAVE --------------------------------------
+		
+		glPushMatrix();
+		glColor3f(0, 0, 0);
+		glTranslatef(0.55, -0.4, -1);
+		glRotatef(-180, 1, 0, 0);
+		glRotatef(-90, 0, 0, 1);
+		glRotatef(180, 0, 1, 0);
+		glutSolidSphere(0.1, 10, 10);
+		glScalef(0.1f, 0.1f, 0.1f);
+		player.drawLocal();
+		glColor3f(1, 1, 1);
+		glScalef(0.2f, 0.2f, 0.2f);
+		Vec3 o = player.geto();
+		Vec3 w = player.getw();
+		Vec3 v = player.getv();
+		Vec3 u = player.getu();
+
+		GLfloat matrix_transformacion[16] = {
+			u.x, u.y, u.z, 0.0f,
+			-w.x, -w.y, -w.z, 0.0f,
+			v.x, v.y, v.z, 0.0f,
+			o.x, o.y, o.z, 0.0f,
+		};
+		glMultMatrixf(matrix_transformacion);
+
+		glCallList(nave);
+		glPopMatrix();
+
+		//Velocidad
+		Vec3 posVelocimetro(+0.55f,+0.4f,-1.0f);
+		glColor3f(0, 0, 0);
+		glBegin(GL_TRIANGLE_STRIP);
+		glVertex3f(+0.12/2 + posVelocimetro.x, -0.025f + posVelocimetro.y, posVelocimetro.z);
+		glVertex3f(+0.12/2 + posVelocimetro.x, +0.025f + posVelocimetro.y, posVelocimetro.z);
+		glVertex3f(-0.11 + posVelocimetro.x, -0.025f + posVelocimetro.y, posVelocimetro.z);
+		glVertex3f(-0.11 + posVelocimetro.x, +0.025f + posVelocimetro.y, posVelocimetro.z);
+		glEnd();
+		glColor3f(1,1,1);
+		glBegin(GL_TRIANGLES);
+		glVertex3f(posVelocimetro.x+ -0.1 * speed_Player / MAX_SPEED + 0.02, -0.02f + posVelocimetro.y - 0.02f, posVelocimetro.z);
+		glVertex3f(posVelocimetro.x + -0.1 * speed_Player / MAX_SPEED - 0.02, -0.02f + posVelocimetro.y - 0.02f, posVelocimetro.z);
+		glVertex3f(posVelocimetro.x + -0.1 * speed_Player / MAX_SPEED, -0.02f + posVelocimetro.y, posVelocimetro.z);
+
+		glVertex3f(posVelocimetro.x + -0.1 * speed_Player / MAX_SPEED + 0.02, +0.02f + posVelocimetro.y + 0.02f, posVelocimetro.z);
+		glVertex3f(posVelocimetro.x + -0.1 * speed_Player / MAX_SPEED - 0.02, +0.02f + posVelocimetro.y + 0.02f, posVelocimetro.z);
+		glVertex3f(posVelocimetro.x + -0.1 * speed_Player / MAX_SPEED, +0.02f + posVelocimetro.y, posVelocimetro.z);
+		glEnd();
+		glColor3f(0.5f - speed_Player / MAX_SPEED, speed_Player / MAX_SPEED + 0.1f,0);
+		glBegin(GL_TRIANGLE_STRIP);
+		glVertex3f(+posVelocimetro.x, -0.02f + posVelocimetro.y, posVelocimetro.z);
+		glVertex3f(+posVelocimetro.x, +0.02f + posVelocimetro.y, posVelocimetro.z);
+		glVertex3f(-0.1 * speed_Player / MAX_SPEED + posVelocimetro.x, -0.02f + posVelocimetro.y, posVelocimetro.z);
+		glVertex3f(-0.1 * speed_Player / MAX_SPEED + posVelocimetro.x, +0.02f + posVelocimetro.y, posVelocimetro.z);
+		glEnd();
+
+		//Base Joystick
+		glColor3f(0, 0, 0);
+		glBegin(GL_TRIANGLE_STRIP);
+		glVertex3f(.8f, -0.02, -1);
+		glVertex3f(.8f, +0.02, -1);
+		glVertex3f(punteroDireccion.x + 0.5f, punteroDireccion.y - 0.02f, punteroDireccion.z);
+		glVertex3f(punteroDireccion.x + 0.5f, punteroDireccion.y + 0.02f, punteroDireccion.z);
+		glEnd();
+		glPushMatrix();
+		//Cabeza joystick
+		glColor3f(1, 0, 0);
+		glTranslatef(punteroDireccion.x + 0.5f, punteroDireccion.y, punteroDireccion.z);
+		glutSolidSphere(0.05, 10, 10);
+		glPopMatrix();
+
+		glTranslatef(0.5, 0, -1);
+		glPopMatrix();
+		// ^^^Solidarios al giro
+		// vvvIndependientes
+
+		//--------------------- FIN INDICADORES DE LA NAVE --------------------------------------
+		glPopAttrib();
+
 		glPopMatrix();
 
 		if (camaraActual == primera_persona) {
@@ -935,7 +1084,6 @@ void cabina(GLuint textura) {
 		glPopMatrix();
 		glPopMatrix();
 		
-		//glutSolidTeapot(0.05f);
 		glDisable(GL_TEXTURE_GEN_S);
 		glDisable(GL_TEXTURE_GEN_T);
 
@@ -951,6 +1099,10 @@ void cabina(GLuint textura) {
 // Funcion de atencion al evento de dibujo
 void display()
 {
+	//cout << luces;
+	if (luces && camaraActual != cinematica) { glEnable(GL_LIGHT1); glEnable(GL_LIGHT2); }
+	else { glDisable(GL_LIGHT1); glDisable(GL_LIGHT2);}
+
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -1015,24 +1167,25 @@ void display()
 	GLfloat dir_central2[] = { -0.1f, 0, -1.0f };
 	glLightfv(GL_LIGHT2, GL_SPOT_DIRECTION, dir_central2);
 	#pragma endregion
+	
 	if (camaraActual != tercera_persona && camaraActual != cinematica)
 		gluLookAt(origen.x + offset3p.x, origen.y + offset3p.y, origen.z + offset3p.z, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z); //Desde el frente
 	else if (camaraActual == tercera_persona)
 		gluLookAt(origen.x + offset3p.x, origen.y + offset3p.y, origen.z + offset3p.z, origen.x, origen.y, origen.z, up.x, up.y, up.z); //Desde el frente
 	else if (camaraActual == cinematica) {
-		float distAsteroideCamara = INFINITY;
-		int i = 0; float cont = 0; int ite = 0;
-		if (distAsteroideCamara > MAX_DIST_ASTEROIDES) {
+		distAsteroideCamara = (asteroides[camAstActual].getPos() - player.geto()).norm();
+		float cont = 0; int ite = 0;
+		if (distAsteroideCamara > MAX_DIST_ASTEROIDES/2) {
 			while (distAsteroideCamara > cont) {
-				distAsteroideCamara = (asteroides[i].getPos() - player.geto()).norm();
-				i = (i + 1) % NUM_ASTEROIDES; 
-				cont += 0.2f; ite++;
+				distAsteroideCamara = (asteroides[camAstActual].getPos() - player.geto()).norm();
+				camAstActual = (camAstActual + 1) % NUM_ASTEROIDES;
+				cont += 0.1f; ite++;
 			}
-			i = (i-1)%NUM_ASTEROIDES;
-			cout << i << "   " << cont << "   " << distAsteroideCamara << "          ";
+			camAstActual = (camAstActual -1)%NUM_ASTEROIDES;
+			cout << camAstActual << "   " << cont << "   " << distAsteroideCamara << "        " << ite << endl;
 		}
-		Vec3 pos = asteroides[i].getPos();
-		cout << "a";
+		Vec3 pos = asteroides[camAstActual].getPos();
+		//cout << "a";
 		gluLookAt(pos.x, pos.y, pos.z, origen.x, origen.y, origen.z, up.x, up.y, up.z); //Desde el frente
 	}
 	
@@ -1101,16 +1254,13 @@ void display()
 	//glCallList(asteroide);
 	//glPopMatrix();
 
-
-
-#pragma region cubemap
+	#pragma region cubemap
 	glPushMatrix();
 	glTranslatef(origen.x, origen.y, origen.z);
 	glScalef(9000, 9000, 9000);
 	cubemap(posicionEstrella, fondo, true);
 	glPopMatrix();
-
-#pragma endregion
+	#pragma endregion
 
 
 	for (int i = 0; i < NUM_ASTEROIDES; i++) {
@@ -1122,7 +1272,7 @@ void display()
 	}
 
 	for (int i = 0; i < NUM_EXPLOSIONES; i++) {
-		explosiones[i].Dibujar();
+		explosiones[i].Dibujar(roca);
 	}
 	
 	//Luz de los blasters
@@ -1168,27 +1318,6 @@ void display()
 
 	cabina(interiorNave);
 
-	//Joystick
-	if (mostrarCabina) {
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		glPushMatrix();
-		glDisable(GL_DEPTH_TEST);
-		glDisable(GL_LIGHTING);
-		glDisable(GL_TEXTURE_2D);
-		glColor3f(1, 0, 0);
-		Vec3 punteroDireccion = player.getw() * -1;
-		float rotx = girox, roty = giroy;
-		if (abs(girox) > 1) rotx = 1 * signo(girox);
-		if (abs(giroy) > 1) roty = 1 * signo(giroy);
-		punteroDireccion.rotate(-rotx * 0.1f, player.getu());
-		punteroDireccion.rotate(-roty * 0.1f, player.getv());
-		punteroDireccion += origen;
-		glTranslatef(punteroDireccion.x, punteroDireccion.y, punteroDireccion.z);
-		glTranslatef(player.getv().x * -0.5f, player.getv().y * -0.5f, player.getv().z * -0.5f);
-		glutSolidSphere(0.05, 10, 10);
-		glPopMatrix();
-		glPopAttrib();
-	}
 	terceraPersona();
 
 	if (camaraActual == cinematica) {
@@ -1219,7 +1348,7 @@ void display()
 
 		float anguloUP = transFV.dot(vecUp);
 		if (isnan(anguloUP)) { cout << "check"; }
-		cout << anguloUP * 360 / 2 / PI << endl;
+		//cout << anguloUP * 360 / 2 / PI << endl;
 
 		glPushMatrix();
 		glTranslatef(origen.x, origen.y, origen.z);
@@ -1270,7 +1399,7 @@ void acelerar() {
 }
 void frenar() {
 	//cout << "frenando";
-	if (speed_Player > -MAX_SPEED)
+	if (speed_Player > -MAX_SPEED / 2)
 		speed_Player -= ACCELERATION; //Tiene que ser coerente con el tiempo FALTA
 }
 void esperaDisparo(int n) {
@@ -1281,7 +1410,8 @@ void disparar() {
 	if (!disparando) {
 		disparando = true;
 		cout << "PUM!" << endl;
-		blasters[blasterActual].Disparar(player);
+		blasters[blasterActual].Disparar(player, Vec3(0, -0.1f, -1));
+		//blasters[blasterActual+1].Disparar(player, Vec3(1, 0, 0));
 		blasterActual = (blasterActual + 1) % NUM_BLASTERS;
 		//Llamar aquí al blaster
 		glutTimerFunc(CADENCIA_DISPARO, esperaDisparo, CADENCIA_DISPARO);
@@ -1299,8 +1429,8 @@ void onKey(unsigned char tecla, int x, int y) {
 		frenar();
 		break;
 
-	case 'k':
-	case 'K':
+	case 'f':
+	case 'F':
 		disparar();
 		break;
 
@@ -1330,10 +1460,6 @@ void onKey(unsigned char tecla, int x, int y) {
 		switch (camaraActual)
 		{
 		case basica:
-			if (luces) {
-				glEnable(GL_LIGHT1);
-				glEnable(GL_LIGHT2);
-			}
 			//primeraPersona.setu(Vec3(1, 0, 0));  //x
 			//primeraPersona.setw(Vec3(0, -1, 0)); //y
 			//primeraPersona.setv(Vec3(0, 0, 1));  //z
@@ -1342,14 +1468,8 @@ void onKey(unsigned char tecla, int x, int y) {
 			primeraPersona.setv(player.getv());  //z
 			break;
 		case primera_persona:
-			if (luces) {
-				glEnable(GL_LIGHT1);
-				glEnable(GL_LIGHT2);
-			}
 			break;
 		case tercera_persona:
-			glDisable(GL_LIGHT1);
-			glDisable(GL_LIGHT2);
 			luces = false;
 			break;
 		case cinematica:
@@ -1424,41 +1544,6 @@ void onPassiveMotiotion(int x, int y) {
 
 	girox += (y - yanterior) * pixel2grados;
 	giroy += (x - xanterior) * pixel2grados;
-
-	switch (camaraActual)
-	{
-	case basica:
-		player.rotar(-girox * delta, player.getu());
-		player.rotar(-giroy * delta, player.getv());
-		primeraPersona = player;
-		terceraPersona3d = player;
-
-		cabinaPrimeraPersona.setu(Vec3(1, 0, 0));  //x
-		cabinaPrimeraPersona.setw(Vec3(0, -1, 0)); //y
-		cabinaPrimeraPersona.setv(Vec3(0, 0, 1));  //z
-	case primera_persona:
-		primeraPersona.rotar(-girox * delta, primeraPersona.getu());
-		primeraPersona.rotar(-giroy * delta, primeraPersona.getv());
-
-		cabinaPrimeraPersona.rotar(-girox * delta, cabinaPrimeraPersona.getu());
-		cabinaPrimeraPersona.rotar(-giroy * delta, cabinaPrimeraPersona.getv());
-
-		break;
-	case tercera_persona:
-		player.rotar(-girox * delta, player.getu());
-		player.rotar(-giroy * delta, player.getv());
-
-		terceraPersona3d.rotar(-girox * delta, terceraPersona3d.getu());
-		terceraPersona3d.rotar(-giroy * delta, terceraPersona3d.getv());
-
-		//terceraPersonaNave3d.rotar(-girox * delta, terceraPersona3d.getu());
-		//terceraPersonaNave3d.rotar(-giroy * delta, terceraPersona3d.getv());
-
-		break;
-	default:
-		break;
-	} 
-	
 
 	//xanterior = x;
 	//yanterior = y;

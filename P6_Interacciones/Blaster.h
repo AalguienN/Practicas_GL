@@ -10,7 +10,7 @@ using namespace cb2;
 
 class Blaster;
 
-const int NUM_BLASTERS = 4;
+const int NUM_BLASTERS = 8;
 
 class Blaster {
 private:
@@ -34,7 +34,7 @@ public:
 
 	void Actualizar(float tiempo, float speed_player);
 
-	void Disparar(Sistema3d player);
+	void Disparar(Sistema3d player, Vec3 offset);
 
 	Blaster& Destruir();
 

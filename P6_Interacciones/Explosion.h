@@ -14,7 +14,7 @@ using namespace std;
 class Explosion;
 
 static const int NUM_FRAGMENTOS = 3;
-static const int NUM_EXPLOSIONES = 10;
+static const int NUM_EXPLOSIONES = 50;
 
 class Explosion
 {
@@ -24,11 +24,12 @@ private:
 	GLuint textura; //textura a aplicar a la explosion
 	float size;
 	bool vivo;
+	float crecimiento;
 	//Asteroide fragmentos[3];
 public:
-	Explosion(Vec3 posicion = Vec3(0, 0, 0), float lifeTime = 1, float size = 1, GLuint lista = 0);
+	Explosion(Vec3 posicion = Vec3(0, 0, 0), float lifeTime = 1, float size = 1, float crecimiento = 0, GLuint lista = 0);
 
-	void Iniciar(Vec3 posicion, float size);
+	void Iniciar(Vec3 posicion, float size, float crecimiento);
 
 	void Actualizar(float tiempo);
 

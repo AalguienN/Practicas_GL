@@ -47,5 +47,8 @@
     <ClInclude Include="Explosion.h">
       <Filter>Archivos de encabezado</Filter>
     </ClInclude>
+    <ClInclude Include="audiere-1.9.4-win32\audiere-1.9.4-win32\include\audiere.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

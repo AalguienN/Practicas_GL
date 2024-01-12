@@ -21,6 +21,9 @@
 #include "globales.h"
 #include "Explosion.h"
 
+#include "audiere.h"
+
+
 using namespace std;
 using namespace cb2;
 //using namespace blasterNS;
@@ -89,6 +92,12 @@ Blaster blasters[NUM_BLASTERS];
 Explosion explosiones[NUM_EXPLOSIONES];
 
 //void cubemap(GLfloat posicionEstrella[3], GLuint textura, bool dibujarEstrella);
+
+//AUDIERE:
+audiere::AudioDevicePtr device;
+
+audiere::OutputStreamPtr musica;
+audiere::OutputStreamPtr disparo;
 
 // Funcion de inicializacion propia
 void init()
@@ -246,9 +255,9 @@ void init()
 		glNormal3f(0, 0, 1);
 		for (int j = 0; j < DIM_PLATAFORMA * VERTICES_POR_UNIDAD; j++) {
 			glTexCoord2f(float(i) / 8 / float(VERTICES_POR_UNIDAD), float(j) / 8 / float(VERTICES_POR_UNIDAD));
-			glVertex3f((i-DIM_PLATAFORMA/2)/ float(VERTICES_POR_UNIDAD), (j - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), 0);
+			glVertex3f((i- DIM_PLATAFORMA * VERTICES_POR_UNIDAD /2)/ float(VERTICES_POR_UNIDAD), (j - DIM_PLATAFORMA * VERTICES_POR_UNIDAD / 2) / float(VERTICES_POR_UNIDAD), 0);
 			glTexCoord2f(float(i+1) / 8 / float(VERTICES_POR_UNIDAD), float(j) / 8 / float(VERTICES_POR_UNIDAD));
-			glVertex3f((i + 1 - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), (j - DIM_PLATAFORMA / 2) / float(VERTICES_POR_UNIDAD), 0);
+			glVertex3f((i + 1 - DIM_PLATAFORMA * VERTICES_POR_UNIDAD / 2) / float(VERTICES_POR_UNIDAD), (j - DIM_PLATAFORMA * VERTICES_POR_UNIDAD / 2) / float(VERTICES_POR_UNIDAD), 0);
 		}
 		glEnd();
 	}
@@ -495,7 +504,7 @@ void init()
 	glEnable(GL_TEXTURE_GEN_T);
 	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP);
 	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP);
-	glDisable(GL_LIGHTING);
+	glEnable(GL_LIGHTING);
 	GLfloat Dm_TV[] = { 0.8,0.8,0.8,1.0 };
 	GLfloat Sm_TV[] = { 0.8,0.8,0.8,1.0 };
 	GLfloat s_TV = 20.0;
@@ -634,6 +643,14 @@ void init()
 
 	#pragma endregion
 
+	#pragma region sonidos
+	device = audiere::OpenDevice();
+	musica = OpenSound(device, "tomp3.cc-Space.wav", false);
+	disparo = OpenSound(device, "tomp3.cc-Blaster-sound-effect.wav", false);
+
+	musica->play(); musica->setRepeat(true); musica->setVolume(.25f);
+	#pragma endregion
+
 	//Inicialización del jugador/nave
 	player.seto(Vec3(0, 0, z0)); //Posicion
 	player.setu(Vec3(1, 0, 0));  //x
@@ -664,7 +681,7 @@ void update() {
 
 	Vec3 w = player.getw();
 
-	cout << girox << ",\t" << giroy << ",\t" << delta << endl;
+	// cout << girox << ",\t" << giroy << ",\t" << delta << endl;
 
 	//Giro
 	switch (camaraActual)
@@ -702,9 +719,9 @@ void update() {
 	}
 
 	//Reducimos el giro progresivamente para que parezca más suave
-	if (abs(girox) > 0.1f) { girox -= signo(girox) * delta * abs(girox) * 10; }
+	if (abs(girox) > 0.01f) { girox -= signo(girox) * delta * abs(girox) * 10; }
 	else girox = 0;
-	if (abs(giroy) > 0.1f) { giroy -= signo(giroy) * delta * abs(giroy) * 10; }
+	if (abs(giroy) > 0.01f) { giroy -= signo(giroy) * delta * abs(giroy) * 10; }
 	else giroy = 0;
 
 	//Al final funciona con el sistema de referencia
@@ -715,14 +732,23 @@ void update() {
 	for (int i = 0; i < NUM_ASTEROIDES; i++) {
 		asteroides[i].Actualizar(delta);
 		if (asteroides[i].explosion == true) { 
-			cout << "Explosion solicitada, id:" << i << endl
-				<< "Posicion" << asteroides[i].posicionExplosion.x << ','
-				<< asteroides[i].posicionExplosion.y << ','
-				<< asteroides[i].posicionExplosion.z;
+			//cout << "Explosion solicitada, id:" << i << endl
+			//	<< "Posicion" << asteroides[i].posicionExplosion.x << ','
+			//	<< asteroides[i].posicionExplosion.y << ','
+			//	<< asteroides[i].posicionExplosion.z;
 
-			explosiones[explActual].Iniciar(asteroides[i].posicionExplosion, asteroides[i].size);
+			explosiones[explActual].Iniciar(asteroides[i].posicionExplosion, asteroides[i].size, 10);
 			explActual = (explActual + 1) % NUM_EXPLOSIONES;
-			asteroides[i].explosion = false; }
+			asteroides[i].explosion = false; 
+		}
+
+		//Colisión de la nave con cada asteroide
+		if ((player.geto() - asteroides[i].getPos()).norm() < asteroides[i].size) {
+			speed_Player = 0;
+			player.seto((player.geto() - asteroides[i].getPos()) * 1.001f + player.geto());
+			girox += random(-10, 10);
+			giroy += random(-10, 10);
+		}
 	}
 
 	for (int i = 0; i < NUM_BLASTERS; i++) {
@@ -735,8 +761,6 @@ void update() {
 
 	hora_anterior = hora_actual;
 
-	//texto(10, 10, a.c_str());
-
 	glutPostRedisplay();
 }
 
@@ -744,6 +768,7 @@ void cubemap(GLfloat posicionEstrella[3], GLuint textura, bool dibujarEstrella) 
 
 	glDisable(GL_LIGHTING);
 	glPushMatrix();
+
 	
 	glBindTexture(GL_TEXTURE_2D, estrella);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -858,7 +883,7 @@ void terceraPersona() {
 		}
 
 		//gluLookAt(0, 0, 0, lookAt.x, lookAt.y, lookAt.z, up.x, up.y, up.z);
-		gluLookAt(0, -5, 0, 0, 0, 0, up.x, up.y, up.z);
+		gluLookAt(0, -5, 2, 0, 0, 0, up.x, up.y, up.z);
 
 		//glBindTexture(GL_TEXTURE_2D, textura);
 		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -970,7 +995,7 @@ void cabina(GLuint textura) {
 		player.drawLocal();
 		glColor3f(1, 1, 1);
 		glScalef(0.2f, 0.2f, 0.2f);
-		Vec3 o = player.geto();
+		/*Vec3 o = player.geto();
 		Vec3 w = player.getw();
 		Vec3 v = player.getv();
 		Vec3 u = player.getu();
@@ -983,7 +1008,8 @@ void cabina(GLuint textura) {
 		};
 		glMultMatrixf(matrix_transformacion);
 
-		glCallList(nave);
+		glCallList(nave);*/
+		
 		glPopMatrix();
 
 		//Velocidad
@@ -1142,9 +1168,8 @@ void display()
 	else if (camaraActual == tercera_persona) {
 		lookAt = origen - player.getw();
 		up = terceraPersona3d.getv();
-		offset3p = player.getw()*8;
-		faro1 += offset3p * 8;
-		faro2 += offset3p * 8;
+		offset3p = player.getw()*8 + player.getv() * 2;
+		//offset3p = player.local2global(Vec3(0, 5, 2));
 	}
 
 	else if (camaraActual == cinematica) {
@@ -1182,7 +1207,7 @@ void display()
 				cont += 0.1f; ite++;
 			}
 			camAstActual = (camAstActual -1)%NUM_ASTEROIDES;
-			cout << camAstActual << "   " << cont << "   " << distAsteroideCamara << "        " << ite << endl;
+			//cout << camAstActual << "   " << cont << "   " << distAsteroideCamara << "        " << ite << endl;
 		}
 		Vec3 pos = asteroides[camAstActual].getPos();
 		//cout << "a";
@@ -1215,6 +1240,14 @@ void display()
 	glMaterialf(GL_FRONT, GL_SHININESS, 0);
 
 	glCallList(suelo);
+
+	glPushMatrix();
+	glTranslatef(0, 0, 1);
+	for (int i = 0; i < 10; i++) {
+		glTranslatef(5, 0, 0);
+		glCallList(nave);
+	}
+	glPopMatrix();
 
 	/*
 	//Esfera
@@ -1265,76 +1298,34 @@ void display()
 
 	for (int i = 0; i < NUM_ASTEROIDES; i++) {
 		asteroides[i].Dibujar(asteroide);
+		Vec3 pos = asteroides[i].getPos();
+		Vec3 pos2 = pos;
+		//Vec3 q = player.global2local(pos).normalize();
+		float angulo = (pos-origen).normalize().dot(player.local2global(player.getw() * -1).normalize());
+
+		//if (i == 0) {
+			//cout << angulo << "\n";
+			//Va malllllllll
+			if (abs(angulo) < rad(15)) {
+				cb2::texto(pos2.x, pos2.y, (char*)"Asteroide", pos2.z, VERDE);
+			}
+		//}
+
 	}
 
 	for (int i = 0; i < NUM_BLASTERS; i++) {
 		blasters[i].Dibujar();
 	}
 
-	for (int i = 0; i < NUM_EXPLOSIONES; i++) {
-		explosiones[i].Dibujar(roca);
-	}
-	
-	//Luz de los blasters
-	/*
-	if (blasters[0].isAlive()) {
-		glEnable(GL_LIGHT3);
-		Vec3 b_pos = asteroides[0].getPos();
-		static GLfloat pos1[] = { b_pos.x, b_pos.y, b_pos.z, 1.0}; //PosSpot
-		glLightfv(GL_LIGHT3, GL_POSITION, pos1);
-	}
-	else { glDisable(GL_LIGHT3); }
-
-	if (blasters[1].isAlive()) {
-		glEnable(GL_LIGHT4);
-		Vec3 b_pos = asteroides[1].getPos();
-		static GLfloat pos2[] = { b_pos.x, b_pos.y, b_pos.z, 1.0 }; //PosSpot
-		glLightfv(GL_LIGHT4, GL_POSITION, pos2);
-	}
-	else { glDisable(GL_LIGHT4); }
-
-	if (blasters[2].isAlive()) {
-		glEnable(GL_LIGHT5);
-		Vec3 b_pos = asteroides[2].getPos();
-		static GLfloat pos3[] = { b_pos.x, b_pos.y, b_pos.z, 1.0 }; //PosSpot
-		glLightfv(GL_LIGHT5, GL_POSITION, pos3);
-	}
-	else { glDisable(GL_LIGHT5); }
-
-	if (blasters[3].isAlive()) {
-		glEnable(GL_LIGHT6);
-		Vec3 b_pos = asteroides[3].getPos();
-		static GLfloat pos4[] = { b_pos.x, b_pos.y, b_pos.z, 1.0 }; //PosSpot
-		glLightfv(GL_LIGHT6, GL_POSITION, pos4);
-	}
-	else { glDisable(GL_LIGHT6); }
-	*/
-	
 	//glPushMatrix();
-	//glTranslatef(lookAt.x, lookAt.y, lookAt.z);
-	//glScalef(0.2, 0.2, 0.2);
-	//glCallList(nave);
+	//terceraPersona();
 	//glPopMatrix();
 
-	cabina(interiorNave);
-
-	terceraPersona();
-
-	if (camaraActual == cinematica) {
-		#pragma region AAAAAAAAAAAAAA
-		glPushMatrix();
-		glPushMatrix();
-		glPopMatrix();
-		glTranslatef(lookAt.x, lookAt.y, lookAt.z);
-		//player.drawLocal();
-		//player.drawGlobal();
-		//ejes();
-		glPopMatrix();
+	if (camaraActual == cinematica || camaraActual == tercera_persona) {
+	#pragma region AAAAAAAAAAAAAA
 
 		glEnable(GL_LIGHTING);
 
-		// PROBLEMAS! EN OBRAS!
-		//glBindTexture(GL_TEXTURE_2D, interiorNave);
 		glPushMatrix();
 		Vec3 vecDir = player.getw() * -1;
 		Vec3 vecUp = player.getv();
@@ -1350,17 +1341,21 @@ void display()
 		if (isnan(anguloUP)) { cout << "check"; }
 		//cout << anguloUP * 360 / 2 / PI << endl;
 
-		glPushMatrix();
+		
 		glTranslatef(origen.x, origen.y, origen.z);
 		glRotatef(angulo * 360 / 2 / PI, axis.x, axis.y, axis.z);
-
-		glPushMatrix();
 		glCallList(nave);
 		glPopMatrix();
-		glPopMatrix();
-		#pragma endregion
+	#pragma endregion
 	}
 
+	for (int i = 0; i < NUM_EXPLOSIONES; i++) {
+		explosiones[i].Dibujar(roca);
+	}
+
+	glPushMatrix();
+	cabina(interiorNave);
+	glPopMatrix();
 	/*
 	glPushMatrix();
 	glTranslatef(lookAt.x, lookAt.y, lookAt.z);
@@ -1368,6 +1363,11 @@ void display()
 	//player.drawLocal();
 	glPopMatrix();
 	*/
+
+	#pragma region texto 
+	texto(0, 0, (char*)"Hangar", 3);
+	#pragma endregion
+
 
 	glutSwapBuffers();
 }
@@ -1407,9 +1407,13 @@ void esperaDisparo(int n) {
 }
 void disparar() {
 	//NOTA: Poner sonido gracioso (PIU)
+
 	if (!disparando) {
+
+		disparo->play(); disparo->setRepeat(false); disparo->setVolume(.1f);
+
 		disparando = true;
-		cout << "PUM!" << endl;
+		//cout << "PUM!" << endl;
 		blasters[blasterActual].Disparar(player, Vec3(0, -0.1f, -1));
 		//blasters[blasterActual+1].Disparar(player, Vec3(1, 0, 0));
 		blasterActual = (blasterActual + 1) % NUM_BLASTERS;
@@ -1494,47 +1498,24 @@ void onKey(unsigned char tecla, int x, int y) {
 	//glutPostRedisplay();
 
 }
+
+void onPassiveMotiotion(int x, int y);
+
 void onClick(int boton, int estado, int x, int y) {
 	//Almacenar el pixel donde se hizo el click
 	if (boton == GLUT_LEFT_BUTTON && estado == GLUT_DOWN) {
-
+		disparar();
 	}
-
-	// Ver que punto del viewport corresponde al p xel del click
-	GLint viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport); // origen y extensi n del viewport
-	//Si en alg n momento necesit ramos emplear otro viewport...
-	GLfloat xv = x;
-	GLfloat yv = viewport[3]/*Alto*/ - y;
-
-	//Dibujar en el backbuffer los objetos s lidos y de un color diferente cada uno
-	//select();
-
-	//Leer del backbuffer el color que hay debajo del punto xv, yv
-	//glReadPixels(xv, yv, 1, 1, GL_BLUE, GL_UNSIGNED_BYTE, objeto);
-	glutPostRedisplay();
 }
 
 void onDrag(int x, int y) {
-	static float pixel2grados = 1.0f;
-	/*
-	//al mover el raton hacia la derecha la x del p xel aumenta y el giro es alrededor del eje y positivo
-	giroy += (x - xanterior) * pixel2grados;
-
-	//al movel el raton hacia abajo la y de los p xeles aumenta (recordemos que ba de arriba a abajo) y el giro es alrededor de x positivo
-	girox += (y - yanterior) * pixel2grados;
-	cout << "x:" << girox << "\t y:" << giroy << "\n";
-	*/
-	//glutWarpPointer(windowWidth / 2, windowHeight / 2);
-
-	//xanterior = windowWidth / 2;
-	//yanterior = windowHeight / 2;
-	glutPostRedisplay();
+	disparar();
+	onPassiveMotiotion(x, y);
 }
 
 
 void onPassiveMotiotion(int x, int y) {
-	static float pixel2grados = 0.005f;
+	static float pixel2grados = 0.05f;
 	//glutWarpPointer(windowWidth / 2, windowHeight / 2);
 
 	//Giramos siendo coherentes con el tiempo
@@ -1542,8 +1523,8 @@ void onPassiveMotiotion(int x, int y) {
 	int hora_actual = glutGet(GLUT_ELAPSED_TIME);
 	float delta = (hora_actual - hora_anterior)/100.0f;
 
-	girox += (y - yanterior) * pixel2grados;
-	giroy += (x - xanterior) * pixel2grados;
+	girox += (y - yanterior) * pixel2grados * delta;
+	giroy += (x - xanterior) * pixel2grados * delta;
 
 	//xanterior = x;
 	//yanterior = y;
@@ -1552,10 +1533,19 @@ void onPassiveMotiotion(int x, int y) {
 	glutWarpPointer(windowWidth / 2, windowHeight / 2);
 	glutSetCursor(GLUT_CURSOR_NONE);
 
-
 	xanterior = windowWidth / 2;
 	yanterior = windowHeight / 2;
 	hora_anterior = hora_actual;
+}
+
+void estelaNave(int t) {
+	//Estela detrás de la nave:
+	if (speed_Player > 0) {
+		explosiones[explActual].Iniciar(player.geto() + player.getw(), speed_Player / MAX_SPEED * 0.5f, 1.f);
+		explActual = (explActual + 1) % NUM_EXPLOSIONES;
+	}
+	int r = min(max(abs(100/float(t)), 1), 1000);
+	glutTimerFunc(r, estelaNave, speed_Player); //Partículas estela de la nave
 }
 
 
@@ -1582,11 +1572,13 @@ int main(int argc, char** argv)
 	glutPassiveMotionFunc(onPassiveMotiotion);
 
 	glutIdleFunc(update);		//FPS flexibles
+	glutTimerFunc(100, estelaNave, 100); //Partículas estela de la nave
 
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 
 	// Inicio propio y del bucle de eventos
 	init();
+
 	glutMainLoop();
 }

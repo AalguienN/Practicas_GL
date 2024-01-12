@@ -74,6 +74,10 @@
     <Import Project="..\codebase\OpenGLx86.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <IncludePath>C:\Users\Adrian\Documents\audiere-1.9.4-win32\audiere-1.9.4-win32\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Adrian\Documents\audiere-1.9.4-win32\audiere-1.9.4-win32\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -100,6 +104,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>audiere.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -139,6 +144,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Asteroide.h" />
+    <ClInclude Include="audiere-1.9.4-win32\audiere-1.9.4-win32\include\audiere.h" />
     <ClInclude Include="Blaster.h" />
     <ClInclude Include="codebase2.h" />
     <ClInclude Include="Explosion.h" />
